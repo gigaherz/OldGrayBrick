@@ -20,7 +20,7 @@ Mapper1::Mapper1(NesROMHeader hdr, FILE* rom_file)
 	prom_mask = prom_size-1;
 	vrom_mask = vrom_size-1;
 
-	prom_mode=0;
+	prom_mode=3;
 	vrom_mode=0;
 
 	mirror_select=0;
@@ -170,7 +170,7 @@ u8   Mapper1::Read (u16 addr)
 			}
 		}
 
-		return PROM[addr&0x7fff+(prom_base<<1)];
+		return PROM[(addr-0x8000)&prom_mask+(prom_base<<0)];
 	}
 }
 

@@ -56,6 +56,38 @@ const int bank_offsets0[2][4] = {
 	{0x0000,0x0400,0x0000,0x0400}, // vmirror
 };
 
+class Mapper0: public Mapper
+{
+private:
+	u8 PROM[65536];
+	u8 VROM[65536]; // if no VROM present, the mapper will have VRAM
+
+	NesROMHeader header;
+
+	int prom_banks;
+	int prom_size;
+	int prom_mask;
+
+	int vrom_banks;
+	int vrom_size;
+	int vrom_mask;
+
+public:
+
+	Mapper0(NesROMHeader hdr, FILE* rom_file);
+	virtual ~Mapper0(void);
+	virtual void Write(u16 addr, u8 value);
+	virtual u8   Read (u16 addr);
+	virtual void WritePPU(u16 addr, u8 value);
+	virtual u8   ReadPPU(u16 addr);
+	virtual void Init();
+	virtual void Reset();
+	virtual void Close();
+	virtual void Emulate(u32 clocks);
+	virtual int VMode();
+
+};
+
 
 class Mapper1: public Mapper
 {

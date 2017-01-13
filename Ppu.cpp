@@ -188,6 +188,8 @@ void Ppu::Emulate(u32 clocks)
 			int table_y = y_offset/240;
 			int y_off = (y_tile%30);
 
+			int attr_y = (y_off>>2);
+
 #ifdef PIXEL_BASED
 			int pixels[256];
 
@@ -211,8 +213,7 @@ void Ppu::Emulate(u32 clocks)
 				int pattern0 = ReadPPU(pattern_address + name*16 + 0 + y_pixel);
 				int pattern1 = ReadPPU(pattern_address + name*16 + 8 + y_pixel);
 
-				int attr_x = (y_off>>2); // 32tiles=>5 bits. 5-2 = 3 bits
-				int attr_y = (y_off>>2);
+				int attr_x = (x_off>>2); // 32tiles=>5 bits. 5-2 = 3 bits
 
 				int attribute_addr = name_offset + 0x03c0 + (attr_y<<3) + attr_x;
 				int attribute = ReadPPU(attribute_addr);
@@ -255,9 +256,9 @@ void Ppu::Emulate(u32 clocks)
 				int table_x = x_offset>>8;
 				int x_off = (x_tile&31);
 
-				int name_offset = 0x2000 + ((table_x&1)<<10) + ((table_y&1)<<11);
+				int name_offset = 0x2000; // + ((table_x&1)<<10) + ((table_y&1)<<11);
 
-				int tile_number = ((y_off<<5) + x_off);
+				int tile_number = ((y_off*32) + x_off);
 
 				int name_addr = name_offset + tile_number;
 				int name = ReadPPU(name_addr);
@@ -265,10 +266,9 @@ void Ppu::Emulate(u32 clocks)
 				int pattern0 = ReadPPU(pattern_address + name*16 + 0 + y_pixel);
 				int pattern1 = ReadPPU(pattern_address + name*16 + 8 + y_pixel);
 
-				int attr_x = (y_off>>2); // 32tiles=>5 bits. 5-2 = 3 bits
-				int attr_y = (y_off>>2);
+				int attr_x = (x_off>>2); // 32tiles=>5 bits. 5-2 = 3 bits
 
-				int attribute_addr = name_offset + 0x03c0 + (attr_y<<3) + attr_x;
+				int attribute_addr = name_offset + 0x03c0 + ((attr_y<<3) + attr_x);
 				int attribute = ReadPPU(attribute_addr);
 				int attr_sel = ((y_tile&2)<<1)+(x_tile&2);
 				int attr = (attribute>>attr_sel)&3;

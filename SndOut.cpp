@@ -1,4 +1,4 @@
-#include <stdafx.h>
+#include "stdafx.h"
 #define _WIN32_DCOM
 
 #include <dsound.h>
@@ -26,7 +26,7 @@ const s32 CurBufferSize = 2048;
 const s32 MaxBufferCount = 5;
 const s32 CurBufferCount = MaxBufferCount;
 
-const s32 LimitMode = 1;
+const s32 LimitMode = 0;
 
 s32 SampleRate;
 

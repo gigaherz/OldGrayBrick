@@ -1,7 +1,7 @@
 #include "StdAfx.h"
 #include "Emu.h"
 
-#define ShowDebug 0
+int ShowDebug = 0;
 
 #define SET_FLAG(f,v)	SetFlag(f,v)
 
@@ -25,9 +25,13 @@
 #define CALC_FLAG_N(r) SET_FLAG_N((r)>>7)
 #define CALC_FLAG_Z(r) SET_FLAG_Z(((r)&0xFF)==0)
 #define CALC_FLAG_C(r) SET_FLAG_C(((r)>>8)^((r)>>15))
+#define CALC_FLAG_CB(r) SET_FLAG_C(~((r)>>15))
 #define CALC_FLAG_V(r) SET_FLAG_V(((r) > 127) || ((r) < -128))
 
-void PrintInstructionInfo(u16 addr, u8 op, u8 byte2, u8 byte3);
+//void PrintInstructionInfo(u16 addr, u8 op, u8 byte2, u8 byte3);
+void PrintInstructionInfo1(FILE* f, u16 addr, u8 op, u8 byte2, u8 byte3, Cpu* cpu);
+
+FILE* cpuLog=NULL;
 
 void __forceinline Cpu::SetFlag(int f, u8 v)
 {
@@ -47,10 +51,12 @@ Cpu::~Cpu(void)
 void Cpu::Init()
 {
 	Reset();
+	cpuLog = fopen("i:\\yanese_cpu.log","w");
 }
 
 void Cpu::Close()
 {
+	if(cpuLog) fclose(cpuLog);
 }
 
 // resets the register contents to the initial state
@@ -79,7 +85,9 @@ u8   Cpu::Pop()
 
 u8   Cpu::Fetch()
 {
-	return memory->Read(PC++);
+	u8 value = memory->Read(PC);
+	PC+=1;
+	return value;
 }
 
 void Cpu::Stall(int cycles)
@@ -124,7 +132,10 @@ int Cpu::Step()
 
 	//printf("PREV.: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x\n",PC,A,X,Y,P);
 
-	if(ShowDebug>=1) PrintInstructionInfo(PC,memory->Read(PC),memory->Read(PC+1),memory->Read(PC+2));
+	int old_PC = PC;
+	int old_M0 = memory->Read(PC+0);
+	int old_M1 = memory->Read(PC+1);
+	int old_M2 = memory->Read(PC+2);
 
 	u8 opcode = Fetch();
 	s32 new_A=A;
@@ -470,26 +481,26 @@ int Cpu::Step()
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		new_T=(s32)A-(s32)p1-1+FLAG_C;
 		cycles = 2; //  
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xE5: // SBC nn      Subtract Zero Page      A=A+C-1-[nn]
 		p1 = memory->Read(Fetch()); // nn
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 3; //  
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xF5: // SBC nn,X    Subtract Zero Page,X    A=A+C-1-[nn+X]
 		p1 = memory->Read((Fetch()+X)&0xFF); // nn,X
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 4; //  
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xED: // SBC nnnn    Subtract Absolute       A=A+C-1-[nnnn]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn
 		p1 = memory->Read(a1);
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 4; //  
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xFD: // SBC nnnn,X  Subtract Absolute,X     A=A+C-1-[nnnn+X]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn,X
@@ -497,7 +508,7 @@ int Cpu::Step()
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 4; // *
 		if((a1>>8)<((a1+X)>>8)) cycles++;
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xF9: // SBC nnnn,Y  Subtract Absolute,Y     A=A+C-1-[nnnn+Y]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn,Y
@@ -505,7 +516,7 @@ int Cpu::Step()
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 4; // *
 		if((a1>>8)<((a1+Y)>>8)) cycles++;
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xE1: // SBC (nn,X)  Subtract (Indirect,X)   A=A+C-1-[[nn+X]]
 		a1 = Fetch()+X; // (nn,X)
@@ -513,7 +524,7 @@ int Cpu::Step()
 		p1 = memory->Read(a2);
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 6; //  
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 	case 0xF1: // SBC (nn),Y  Subtract (Indirect),Y   A=A+C-1-[[nn]+Y]
 		a1 = Fetch(); // (nn),Y
@@ -522,7 +533,7 @@ int Cpu::Step()
 		new_A=(s32)(s8)A-(s32)(s8)p1-1+FLAG_C;
 		cycles = 5; // *
 		if((a2>>8)<((a2+X)>>8)) cycles++;
-		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);SET_FLAG_C((new_A>>15)^1);CALC_FLAG_V(new_A);
+		CALC_FLAG_N(new_A);CALC_FLAG_Z(new_A);CALC_FLAG_CB(new_A);CALC_FLAG_V(new_A);
 		break;
 
 	// * Add one cycle if indexing crosses a page boundary.
@@ -723,26 +734,26 @@ int Cpu::Step()
 		p1 = Fetch(); // #nn
 		new_T=A-p1;
 		cycles = 2; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xC5: // CMP nn      Compare A with Zero Page     A-[nn]
 		p1 = memory->Read(Fetch()); // nn
 		new_T=A-p1;
 		cycles = 3; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xD5: // CMP nn,X    Compare A with Zero Page,X   A-[nn+X]
 		p1 = memory->Read((Fetch()+X)&0xFF); // nn,X
 		new_T=A-p1;
 		cycles = 4; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xCD: // CMP nnnn    Compare A with Absolute      A-[nnnn]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn
 		p1 = memory->Read(a1);
 		new_T=A-p1;
 		cycles = 4; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xDD: // CMP nnnn,X  Compare A with Absolute,X    A-[nnnn+X]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn,X
@@ -750,7 +761,7 @@ int Cpu::Step()
 		new_T=A-p1;
 		cycles = 4; // *
 		if((a1>>8)<((a1+X)>>8)) cycles++;
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xD9: // CMP nnnn,Y  Compare A with Absolute,Y    A-[nnnn+Y]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn,Y
@@ -758,7 +769,7 @@ int Cpu::Step()
 		new_T=A-p1;
 		cycles = 4; // *
 		if((a1>>8)<((a1+Y)>>8)) cycles++;
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xC1: // CMP (nn,X)  Compare A with (Indirect,X)  A-[[nn+X]]
 		a1 = Fetch()+X; // (nn,X)
@@ -766,7 +777,7 @@ int Cpu::Step()
 		p1 = memory->Read(a2);
 		new_T=A-p1;
 		cycles = 6; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xD1: // CMP (nn),Y  Compare A with (Indirect),Y  A-[[nn]+Y]
 		a1 = Fetch(); // (nn),Y
@@ -775,45 +786,45 @@ int Cpu::Step()
 		new_T=A-p1;
 		cycles = 5; // *
 		if((a2>>8)<((a2+Y)>>8)) cycles++;
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xE0: // CPX #nn     Compare X with Immediate     X-nn
 		p1 = Fetch(); // #nn
 		new_T=X-p1;
 		cycles = 2; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xE4: // CPX nn      Compare X with Zero Page     X-[nn]
 		p1 = memory->Read(Fetch()); // nn
 		new_T=X-p1;
 		cycles = 3; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xEC: // CPX nnnn    Compare X with Absolute      X-[nnnn]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn
 		p1 = memory->Read(a1);
 		new_T=X-p1;
 		cycles = 4; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xC0: // CPY #nn     Compare Y with Immediate     Y-nn
 		p1 = Fetch(); // #nn
 		new_T=X-p1;
 		cycles = 2; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xC4: // CPY nn      Compare Y with Zero Page     Y-[nn]
 		p1 = memory->Read(Fetch()); // nn
 		new_T=X-p1;
 		cycles = 3; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 	case 0xCC: // CPY nnnn    Compare Y with Absolute      Y-[nnnn]
 		a1 = Fetch()|(((u16)Fetch())<<8); // nnnn
 		p1 = memory->Read(a1);
 		new_T=X-p1;
 		cycles = 4; //  
-		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);SET_FLAG_C((new_T>>15)^1);
+		CALC_FLAG_N(new_T);CALC_FLAG_Z(new_T);CALC_FLAG_CB(new_T);
 		break;
 
 	// * Add one cycle if indexing crosses a page boundary.
@@ -1122,9 +1133,8 @@ int Cpu::Step()
 	    
 		break;
 	case 0x6C: // JMP (nnnn)  Jump Indirect              PC=WORD[nnnn]
-		a1 = Fetch()|(((u16)Fetch())<<8); // (nnnn)
-		a2 = a1&0xFF00;
-		a1 = a1&0xFF;
+		a1 = Fetch(); // (nnnn)
+		a2 = ((u16)Fetch())<<8;
 		PC = memory->Read(a2|a1)|(memory->Read(a2|((a1+1)&0xFF))<<8);
 		cycles = 5; //  
 	    
@@ -1132,7 +1142,7 @@ int Cpu::Step()
 	case 0x20: // JSR nnnn    Jump and Save Return Addr. [S]=PC+2,PC=nnnn
 		new_T = Fetch(); // nnnn
 		Push(PC>>8);
-		Push(PC);
+		Push(PC&0xFF);
 		PC=new_T|(((u16)Fetch())<<8);
 		cycles = 6; //  
 	    
@@ -1240,10 +1250,6 @@ int Cpu::Step()
 			cycles++;
 			if((PC>>8)!=((PC+d1)>>8)) cycles++;
 			PC+=d1;
-		}
-		else
-		{
-			PC=PC;
 		}
 		break;
 
@@ -1549,6 +1555,12 @@ int Cpu::Step()
 		if(ShowDebug>=2) printf("\t\t\tOP %02x: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x(Z=%d/C=%d/N=%d/V=%d)\n",opcode,PC,A,X,Y,P,FLAG_Z,FLAG_C,FLAG_N,FLAG_V);
 	}
 
+	if(ShowDebug>=1)
+	{
+		//PrintInstructionInfo1(stdout,old_PC,old_M0,old_M1,old_M2,this);
+		PrintInstructionInfo1(cpuLog,old_PC,old_M0,old_M1,old_M2,this);
+	}
+
 	return cycles;
 }
 
@@ -1823,21 +1835,40 @@ struct OpInfo {
 
 };
 
-void PrintInstructionInfo(u16 addr, u8 op, u8 byte2, u8 byte3)
+void PrintInstructionInfo1(FILE* f, u16 addr, u8 op, u8 byte2, u8 byte3, Cpu* cpu)
 {
 	OpInfo opi= opinfo[op];
 
 	switch(opi.addrmode)
 	{
-	case 0: printf("%04x: %02x = %s            %s\n",    addr,op,opi.opname,opi.desc); break;
-	case 1: printf("%04x: %02x = %s #%02x        %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
-	case 2: printf("%04x: %02x = %s %02x         %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
-	case 3: printf("%04x: %02x = %s %02x,X       %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
-	case 4: printf("%04x: %02x = %s %02x%02x       %s\n",addr,op,opi.opname,byte3,byte2,opi.desc); break;
-	case 5: printf("%04x: %02x = %s %02x%02x,X     %s\n",addr,op,opi.opname,byte3,byte2,opi.desc); break;
-	case 6: printf("%04x: %02x = %s %02x%02x,Y     %s\n",addr,op,opi.opname,byte3,byte2,opi.desc); break;
-	case 7: printf("%04x: %02x = %s (%02x,X)     %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
-	case 8: printf("%04x: %02x = %s (%02x),Y     %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
-	case 9: printf("%04x: %02x = %s %+04d     %s\n",  addr,op,opi.opname,(s8)byte2,opi.desc); break;
+	case 0: fprintf(f,"%04x  %02x        %s            A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",           addr,op,				opi.opname,						cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 1: fprintf(f,"%04x  %02x %02x     %s #$%02x        A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",      addr,op,byte2,		opi.opname,byte2,				cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 2: fprintf(f,"%04x  %02x %02x     %s $%02x         A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",      addr,op,byte2,		opi.opname,byte2,				cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 3: fprintf(f,"%04x  %02x %02x     %s $%02x,%02x      A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",    addr,op,byte2,		opi.opname,byte2,cpu->X,		cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 4: fprintf(f,"%04x  %02x %02x %02x  %s $%02x%02x       A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",  addr,op,byte2,byte3,	opi.opname,byte3,byte2,			cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 5: fprintf(f,"%04x  %02x %02x %02x  %s $%02x%02x,%02x    A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",addr,op,byte2,byte3,	opi.opname,byte3,byte2,cpu->X,	cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 6: fprintf(f,"%04x  %02x %02x %02x  %s $%02x%02x,%02x    A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",addr,op,byte2,byte3,	opi.opname,byte3,byte2,cpu->Y,	cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 7: fprintf(f,"%04x  %02x %02x     %s ($%02x,%02x)    A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",    addr,op,byte2,		opi.opname,byte2,cpu->X,		cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 8: fprintf(f,"%04x  %02x %02x     %s ($%02x),%02x    A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",    addr,op,byte2,		opi.opname,byte2,cpu->Y,		cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	case 9: fprintf(f,"%04x  %02x %02x     %s %+04d     A:%02x X:%02x Y:%02x P:%02x SP:%02x CYC:%3d SL:%d\n",          addr,op,byte2,		opi.opname,(s8)byte2,			cpu->A,cpu->X,cpu->Y,cpu->P,cpu->S,0,0); break;
+	}
+}
+
+void PrintInstructionInfo2(u16 addr, u8 op, u8 byte2, u8 byte3)
+{
+	OpInfo opi= opinfo[op];
+
+	switch(opi.addrmode)
+	{
+	case 0: printf("%04x  %02x = %s            %s\n",    addr,op,opi.opname,opi.desc); break;
+	case 1: printf("%04x  %02x = %s #%02x        %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
+	case 2: printf("%04x  %02x = %s %02x         %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
+	case 3: printf("%04x  %02x = %s %02x,X       %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
+	case 4: printf("%04x  %02x = %s %02x%02x       %s\n",addr,op,opi.opname,byte3,byte2,opi.desc); break;
+	case 5: printf("%04x  %02x = %s %02x%02x,X     %s\n",addr,op,opi.opname,byte3,byte2,opi.desc); break;
+	case 6: printf("%04x  %02x = %s %02x%02x,Y     %s\n",addr,op,opi.opname,byte3,byte2,opi.desc); break;
+	case 7: printf("%04x  %02x = %s (%02x,X)     %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
+	case 8: printf("%04x  %02x = %s (%02x),Y     %s\n",  addr,op,opi.opname,byte2,opi.desc); break;
+	case 9: printf("%04x  %02x = %s %+04d     %s\n",  addr,op,opi.opname,(s8)byte2,opi.desc); break;
 	}
 }

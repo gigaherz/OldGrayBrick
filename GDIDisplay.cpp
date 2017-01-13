@@ -140,6 +140,24 @@ public:
 		return true;
 	}
 
+	virtual bool PretendRender()
+	{
+		frames++;
+
+		int tickdiff=GetTickCount()-ticks;
+		if(tickdiff>=1000)
+		{
+			static char m1[100];
+			float fps=(frames*1000.0)/tickdiff;
+			sprintf(m1,"%d frames rendered in %d ms = %1.3f fps.", frames,tickdiff,fps);
+			SetWindowTextA(hWnd,m1);
+			frames=0;
+			ticks=GetTickCount();
+		}
+
+		return true;
+	}
+
 	virtual void Close()
 	{
 	}

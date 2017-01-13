@@ -119,10 +119,11 @@
 				Name="VCCLCompilerTool"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
 				RuntimeLibrary="2"
-				UsePrecompiledHeader="2"
+				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="false"
 				DebugInformationFormat="3"
+				EnablePREfast="false"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -246,6 +247,10 @@
 			<Filter
 				Name="Mappers"
 				>
+				<File
+					RelativePath=".\Mapper0.cpp"
+					>
+				</File>
 				<File
 					RelativePath=".\Mapper1.cpp"
 					>

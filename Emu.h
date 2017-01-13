@@ -9,6 +9,7 @@ class Display
 public:
 	virtual bool Init(HWND displayWindow, bool fullScreen)=0;
 	virtual bool Render()=0;
+	virtual bool PretendRender()=0;
 	virtual void Close()=0;
 	virtual void SetScanline(int line, int *data)=0;
 };
@@ -78,7 +79,7 @@ public:
 
 class Cpu
 {
-private:
+public:
 
 	//Bits  Name  Expl.
 	u16     PC;// Program Counter
@@ -91,6 +92,8 @@ private:
 	u8      S; // Stack Pointer (see below)
 
 	u8      P; // Processor Status Register (see below)
+
+private:
 
 	// Stack management
 	void Push(u8 value);

@@ -97,12 +97,14 @@ void Core::Emulate()
 		return;
 	}
 
-	int maxSteps = 1000;
-	while(maxSteps-->0)
+	int maxCycles = 10000;
+	while(maxCycles>0)
 	{
 		int cycles = cpu->Step();
 		ppu->Emulate(cycles);
-		apu->Emulate(cycles);
+		//apu->Emulate(cycles);
+
+		maxCycles -= cycles;
 
 		if(hadVSync)
 		{
@@ -121,6 +123,7 @@ void Core::Emulate()
 void Core::DoVSync()
 {
 	display->Render();
+	//display->PretendRender();
 
 	// other things
 }
