@@ -1,0 +1,15 @@
+
+/Debug/
+/Release
+/Backup
+/Debug
+/Release
+/ipch
+*.aps
+*.ncb
+*.suo
+*.user
+*.vc.db
+*.opendb
+*.rar
+/UpgradeLog*.htm*
