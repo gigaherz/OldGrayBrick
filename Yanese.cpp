@@ -234,7 +234,6 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 
 			if(menuId!=0)
 			{
-				printf("Received WM_COMMAND for menu item: %d\n",menuId);
 				HandleMenuClick(hWnd, menuId);
 			}
 		}

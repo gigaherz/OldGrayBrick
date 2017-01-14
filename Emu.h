@@ -93,6 +93,8 @@ public:
 
 	u8      P; // Processor Status Register (see below)
 
+    int totalCycles;
+
 private:
 
 	// Stack management
@@ -107,6 +109,8 @@ private:
 	int stall;
 
 	void __forceinline SetFlag(int f, u8 v);
+
+    void PrintInstructionInfo1(FILE* f, u16 addr, u8 op, u8 byte2, u8 byte3);
 
 public:
 	Cpu(void);

@@ -3,6 +3,7 @@
 
 Memory::Memory(void)
 {
+    memset(WorkRam, 0, sizeof(WorkRam));
 }
 
 Memory::~Memory(void)

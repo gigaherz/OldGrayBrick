@@ -72,9 +72,6 @@ void Mapper0::WritePPU(u16 addr, u8 value)
 		int whichbank = (addr_base>>10);
 		int whichoffset = addr_base&0x3ff;
 
-		if(whichbank!=0)
-			printf("Bank %d\n", whichbank);
-
 		int vaddr = bank_offsets0[header.mirror][whichbank] + whichoffset;
 
 		ppu->WriteVRAM(vaddr,value);
