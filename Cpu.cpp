@@ -1,7 +1,7 @@
 #include "StdAfx.h"
 #include "Emu.h"
 
-int ShowDebug = 1;
+int ShowDebug = 0;
 
 #define SET_FLAG(f,v)	SetFlag(f,v)
 
@@ -62,9 +62,9 @@ void Cpu::Reset()
     A = 0;
     X = 0;
     Y = 0;
-    P = 0x24;
-    S = 0xFD; // 0xFF;
-    PC = 0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
+    P = 0x34;
+    S = 0xFD;
+    PC = /*0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
     SET_FLAG_I(1);
 }
 
@@ -153,7 +153,7 @@ int Cpu::Step()
 
     int cycles = 2;
 
-#define SIGN_EXTEND(a) ((s32)(s32)(a))
+#define SIGN_EXTEND(a) ((s32)(s8)(a))
 
 #define ADDR_ZERO_PAGE() a1 = Fetch()
 #define ADDR_ZERO_PAGE_X() a1 = (Fetch() + X) & 0xFF
@@ -433,6 +433,8 @@ int Cpu::Step()
 
     case 0x69: // ADC #nn     Add Immediate           A=A+C+nn
         FETCH_IMMEDIATE(); // #nn
+        if (p1 == 0x80 && A == 0x7f)
+            A = A;
         ADC();
         cycles = 2; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
