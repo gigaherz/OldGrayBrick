@@ -52,8 +52,6 @@ u8   Mapper0::Read (u16 addr)
 
 void Mapper0::WritePPU(u16 addr, u8 value)
 {
-	if(addr == 0x243f)
-		addr = addr;
 	if(addr<0x2000)
 	{
 		if(vrom_banks>0) 

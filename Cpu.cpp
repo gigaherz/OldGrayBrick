@@ -1,7 +1,7 @@
 #include "StdAfx.h"
 #include "Emu.h"
 
-int ShowDebug = 0;
+int ShowDebug = 1;
 
 #define SET_FLAG(f,v)	SetFlag(f,(v))
 
@@ -64,7 +64,7 @@ void Cpu::Reset()
     Y = 0;
     P = 0x24; // 0x34;
     S = 0xFD;
-    PC = /*0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
+    PC = 0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
     SET_FLAG_I(1);
 }
 
@@ -252,14 +252,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         new_A = p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xB9: // LDA nnnn,Y  Load A with Absolute,Y    A=[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         new_A = p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xA1: // LDA (nn,X)  Load A with (Indirect,X)  A=[WORD[nn+X]]
@@ -272,7 +272,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         new_A = p1;
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + Y) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xA2: // LDX #nn     Load X with Immediate     X=nn
@@ -303,7 +303,7 @@ int Cpu::Step()
         FETCH_ABSOLUTE_Y();
         new_X = p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_X); CALC_FLAG_Z(new_X);
         break;
     case 0xA0: // LDY #nn     Load Y with Immediate     Y=nn
@@ -334,7 +334,7 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         new_Y = p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_Y); CALC_FLAG_Z(new_Y);
         break;
 
@@ -470,14 +470,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         ADC();
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x79: // ADC nnnn,Y  Add Absolute,Y          A=A+C+[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         ADC();
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x61: // ADC (nn,X)  Add (Indirect,X)        A=A+C+[[nn+X]]
@@ -490,7 +490,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         ADC();
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + Y) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
 
@@ -528,14 +528,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         SBC();
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xF9: // SBC nnnn,Y  Subtract Absolute,Y     A=A+C-1-[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         SBC();
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xE1: // SBC (nn,X)  Subtract (Indirect,X)   A=A+C-1-[[nn+X]]
@@ -548,7 +548,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         SBC();
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + X) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
 
@@ -587,14 +587,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         AND();
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x39: // AND nnnn,Y  AND Absolute,Y     A=A AND [nnnn+Y]
         FETCH_ABSOLUTE_Y();
         AND();
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x21: // AND (nn,X)  AND (Indirect,X)   A=A AND [[nn+X]]
@@ -607,7 +607,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         AND();
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + Y) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
 
@@ -643,14 +643,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         new_A = A^p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x59: // EOR nnnn,Y  XOR Absolute,Y     A=A XOR [nnnn+Y]
         FETCH_ABSOLUTE_Y();
         new_A = A^p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x41: // EOR (nn,X)  XOR (Indirect,X)   A=A XOR [[nn+X]]
@@ -663,7 +663,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         new_A = A^p1;
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + Y) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
 
@@ -699,14 +699,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         new_A = A | p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x19: // ORA nnnn,Y  OR Absolute,Y      A=A OR [nnnn+Y]
         FETCH_ABSOLUTE_Y();
         new_A = A | p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x01: // ORA (nn,X)  OR (Indirect,X)    A=A OR [[nn+X]]
@@ -719,7 +719,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         new_A = A | p1;
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + X) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
 
@@ -755,14 +755,14 @@ int Cpu::Step()
         FETCH_ABSOLUTE_X();
         new_T = A - p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_CB(new_T);
         break;
     case 0xD9: // CMP nnnn,Y  Compare A with Absolute,Y    A-[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         new_T = A - p1;
         cycles = 4; // *
-        if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
+        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_CB(new_T);
         break;
     case 0xC1: // CMP (nn,X)  Compare A with (Indirect,X)  A-[[nn+X]]
@@ -775,7 +775,7 @@ int Cpu::Step()
         FETCH_INDIRECT_Y();
         new_T = A - p1;
         cycles = 5; // *
-        if ((a2 >> 8) < ((a2 + Y) >> 8)) cycles++;
+        if ((a2 >> 8) != ((a2 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_CB(new_T);
         break;
     case 0xE0: // CPX #nn     Compare X with Immediate     X-nn
@@ -1139,7 +1139,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1150,7 +1150,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1161,7 +1161,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1172,7 +1172,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1183,7 +1183,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1194,7 +1194,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1205,7 +1205,7 @@ int Cpu::Step()
         cycles = 2; // *
         if (cond) {
             cycles++;
-            if ((PC >> 8) < ((PC + d1) >> 8)) cycles++;
+            if ((PC >> 8) != ((PC + d1) >> 8)) cycles++;
             PC += d1;
         }
         break;
@@ -1708,9 +1708,9 @@ struct OpInfo {
 { 0xA9, 2, 0x0002, 1, "LDA", "nz---- ", "Load A with Immediate     A=nn" },
 { 0xAA, 1, 0x0002, 0, "TAX", "nz---- ", "Transfer Accumulator to X    X=A" },
 { 0xAB, 2, 0x0002, 1, "LAX", "nz---- ", "(2)) LDA+TAX  A,X=nn" },
-{ 0xAC, 3, 0x0004, 4, "LDY", "nz---- ", "Load Y with Absolute      Y=[nnnn]" },
-{ 0xAD, 3, 0x0004, 4, "LDA", "nz---- ", "Load A with Absolute      A=[nnnn]" },
-{ 0xAE, 3, 0x0004, 4, "LDX", "nz---- ", "Load X with Absolute      X=[nnnn]" },
+{ 0xAC, 3, 0x0004, 104, "LDY", "nz---- ", "Load Y with Absolute      Y=[nnnn]" },
+{ 0xAD, 3, 0x0004, 104, "LDA", "nz---- ", "Load A with Absolute      A=[nnnn]" },
+{ 0xAE, 3, 0x0004, 104, "LDX", "nz---- ", "Load X with Absolute      X=[nnnn]" },
 { 0xAF, 3, 0x0004, 4, "LAX", "nz---- ", "LDA+LDX  A,X=[nnnn]" },
 { 0xB0, 1, 0xC002, 9, "BCS", "------ ", "Branch on carry set       if C=1 PC=PC+/-nn" },
 { 0xB1, 2, 0x8005, 8, "LDA", "nz---- ", "Load A with (Indirect),Y  A=[WORD[nn]+Y]" },
@@ -1813,6 +1813,9 @@ void Cpu::PrintInstructionInfo1(FILE* f, u16 addr, u8 op, u8 byte2, u8 byte3)
     case 7: fprintf(f, "%04X  %02X %02X     %s ($%02X,%02X)                    A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%3d\n", addr, op, byte2, opi.opname, byte2, X, A, X, Y, P, S, c); break;
     case 8: fprintf(f, "%04X  %02X %02X     %s ($%02X),%02X                    A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%3d\n", addr, op, byte2, opi.opname, byte2, Y, A, X, Y, P, S, c); break;
     case 9: fprintf(f, "%04X  %02X %02X     %s $%04X                       A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%3d\n", addr, op, byte2, opi.opname, addr + 2 + byte2, A, X, Y, P, S, c); break;
+
+        // Shows value at memory address
+    case 104: fprintf(f, "%04X  %02X %02X %02X  %s $%02X%02X = %02x                  A:%02X X:%02X Y:%02X P:%02X SP:%02X CYC:%3d\n", addr, op, byte2, byte3, opi.opname, byte3, byte2, memory->Read((byte3<<8)+byte2), A, X, Y, P, S, c); break;
     }
 }
 
