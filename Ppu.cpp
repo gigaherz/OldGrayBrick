@@ -118,6 +118,12 @@ void Ppu::Reset()
 	status=0;
 }
 
+void Ppu::SoftReset()
+{
+    Reset();
+}
+
+
 void Ppu::Close()
 {
 }
@@ -135,6 +141,7 @@ void Ppu::Emulate(u32 clocks)
 	float scanline_clocks;
 
 	int scanline_last;
+
 
 	// accumulate clocks
 	if(vmode) // PAL
@@ -190,6 +197,7 @@ void Ppu::Emulate(u32 clocks)
 
 			int attr_y = (y_off>>2);
 
+#define PIXEL_BASED 1
 #ifdef PIXEL_BASED
 			int pixels[256];
 
@@ -321,6 +329,31 @@ void Ppu::Emulate(u32 clocks)
 		{
 			scanline=0;
 			frame++;
+
+#define TIME_PER_FRAME_PAL (1000.0f/53.355f)
+#define TIME_PER_FRAME_NTSC (1000.0f/60.098f)
+
+            float time_per_frame =
+                vmode ? TIME_PER_FRAME_PAL : TIME_PER_FRAME_NTSC;
+
+            static int ticks_last = 0;
+            static float elapsed_acc = 0;
+            do {
+                int ticks_now = GetTickCount();
+                int elapsed = ticks_now - ticks_last;
+                ticks_last = ticks_now;
+                elapsed_acc += elapsed;
+                if (elapsed_acc < time_per_frame)
+                {
+                    SleepEx(max(1,(int)(time_per_frame - elapsed_acc)), TRUE);
+                }
+                else {
+                    elapsed_acc -= time_per_frame;
+                    if (elapsed_acc > 10 * time_per_frame)
+                        elapsed_acc = 0;
+                    break;
+                }
+            } while (1);
 		}
 	}
 

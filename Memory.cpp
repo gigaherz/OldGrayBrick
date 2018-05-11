@@ -74,6 +74,11 @@ u8   Memory::Read (u16 addr)
 void Memory::Reset()
 {
 }
+
+void Memory::SoftReset()
+{
+}
+
 void Memory::Init()
 {
 	Reset();

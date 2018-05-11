@@ -3,7 +3,7 @@
 
 int ShowDebug = 0;
 
-#define SET_FLAG(f,v)	SetFlag(f,v)
+#define SET_FLAG(f,v)	SetFlag(f,(v))
 
 #define SET_FLAG_C(v)   SET_FLAG(0,v)
 #define SET_FLAG_Z(v)   SET_FLAG(1,v)
@@ -62,10 +62,17 @@ void Cpu::Reset()
     A = 0;
     X = 0;
     Y = 0;
-    P = 0x34;
+    P = 0x24; // 0x34;
     S = 0xFD;
     PC = /*0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
     SET_FLAG_I(1);
+}
+
+void Cpu::SoftReset()
+{
+    SET_FLAG_I(1);
+    S += 3; // simulate RTI
+    PC = /*0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
 }
 
 void Cpu::Push(u8 value)
@@ -159,16 +166,17 @@ int Cpu::Step()
 #define ADDR_ZERO_PAGE_X() a1 = (Fetch() + X) & 0xFF
 #define ADDR_ZERO_PAGE_Y() a1 = (Fetch() + Y) & 0xFF
 #define ADDR_ABSOLUTE() a1 = Fetch() | (((u16)Fetch()) << 8)
+#define ADDR_ABSOLUTE_OFF(off) a1 = (Fetch() | (((u16)Fetch()) << 8)) + off
 #define ADDR_INDIRECT_X() a1 = Fetch() + X; a2 = memory->Read(a1 & 0xFF) | (((u16)memory->Read((a1 + 1) & 0xFF)) << 8)
-#define ADDR_INDIRECT() a1 = Fetch(); a2 = memory->Read(a1) | (((u16)memory->Read(a1 + 1)) << 8)
+#define ADDR_INDIRECT() a1 = Fetch(); a2 = memory->Read(a1) | (((u16)memory->Read((a1 + 1)&0xFF)) << 8)
 
 #define FETCH_IMMEDIATE() p1 = Fetch()
 #define FETCH_ZERO_PAGE()   ADDR_ZERO_PAGE(); p1 = memory->Read(a1)
 #define FETCH_ZERO_PAGE_X() ADDR_ZERO_PAGE_X(); p1 = memory->Read(a1)
 #define FETCH_ZERO_PAGE_Y() ADDR_ZERO_PAGE_Y(); p1 = memory->Read(a1)
 #define FETCH_ABSOLUTE()    ADDR_ABSOLUTE(); p1 = memory->Read(a1)
-#define FETCH_ABSOLUTE_X()  ADDR_ABSOLUTE(); p1 = memory->Read(a1 + X)
-#define FETCH_ABSOLUTE_Y()  ADDR_ABSOLUTE(); p1 = memory->Read(a1 + Y)
+#define FETCH_ABSOLUTE_X()  ADDR_ABSOLUTE_OFF(X); p1 = memory->Read(a1)
+#define FETCH_ABSOLUTE_Y()  ADDR_ABSOLUTE_OFF(Y); p1 = memory->Read(a1)
 #define FETCH_INDIRECT_X()  ADDR_INDIRECT_X(); p1 = memory->Read(a2)
 #define FETCH_INDIRECT_Y()  ADDR_INDIRECT(); p1 = memory->Read(a2 + Y)
 
@@ -429,118 +437,119 @@ int Cpu::Step()
 
         // Add memory to accumulator with carry
 
-#define ADC() (new_A=SIGN_EXTEND(A)+SIGN_EXTEND(p1)+FLAG_C)
+        // FIXME!!! Make the overflow flag work, instead of this hack?!
+#define ADC() (new_A=(A)+(p1)+FLAG_C);(new_T=SIGN_EXTEND(A)+SIGN_EXTEND(p1)+FLAG_C)
 
     case 0x69: // ADC #nn     Add Immediate           A=A+C+nn
         FETCH_IMMEDIATE(); // #nn
-        if (p1 == 0x80 && A == 0x7f)
+        if (p1 == 0x80 && A == 0x7f && P==0x25)
             A = A;
         ADC();
         cycles = 2; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x65: // ADC nn      Add Zero Page           A=A+C+[nn]
         FETCH_ZERO_PAGE(); // nn
         ADC();
         cycles = 3; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x75: // ADC nn,X    Add Zero Page,X         A=A+C+[nn+X]
         FETCH_ZERO_PAGE_X(); // nn,X
         ADC();
         cycles = 4; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x6D: // ADC nnnn    Add Absolute            A=A+C+[nnnn]
         FETCH_ABSOLUTE();
         ADC();
         cycles = 4; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x7D: // ADC nnnn,X  Add Absolute,X          A=A+C+[nnnn+X]
         FETCH_ABSOLUTE_X();
         ADC();
         cycles = 4; // *
         if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x79: // ADC nnnn,Y  Add Absolute,Y          A=A+C+[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         ADC();
         cycles = 4; // *
         if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x61: // ADC (nn,X)  Add (Indirect,X)        A=A+C+[[nn+X]]
         FETCH_INDIRECT_X();
         ADC();
         cycles = 6; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
     case 0x71: // ADC (nn),Y  Add (Indirect),Y        A=A+C+[[nn]+Y]
         FETCH_INDIRECT_Y();
         ADC();
         cycles = 5; // *
         if ((a2 >> 8) < ((a2 + Y) >> 8)) cycles++;
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
         break;
 
         // * Add one cycle if indexing crosses a page boundary.
 
         // Subtract memory from accumulator with borrow
 
-#define SBC() (new_A=SIGN_EXTEND(A)-SIGN_EXTEND(p1)-1+FLAG_C)
+#define SBC() (new_A=(A)-(p1)-1+FLAG_C);(new_T=SIGN_EXTEND(A)-SIGN_EXTEND(p1)-1+FLAG_C)
 
     case 0xE9: // SBC #nn     Subtract Immediate      A=A+C-1-nn
         FETCH_IMMEDIATE(); // #nn
         SBC();
         cycles = 2; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xE5: // SBC nn      Subtract Zero Page      A=A+C-1-[nn]
         FETCH_ZERO_PAGE(); // nn
         SBC();
         cycles = 3; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xF5: // SBC nn,X    Subtract Zero Page,X    A=A+C-1-[nn+X]
         FETCH_ZERO_PAGE_X(); // nn,X
         SBC();
         cycles = 4; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xED: // SBC nnnn    Subtract Absolute       A=A+C-1-[nnnn]
         FETCH_ABSOLUTE();
         SBC();
         cycles = 4; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xFD: // SBC nnnn,X  Subtract Absolute,X     A=A+C-1-[nnnn+X]
         FETCH_ABSOLUTE_X();
         SBC();
         cycles = 4; // *
         if ((a1 >> 8) < ((a1 + X) >> 8)) cycles++;
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xF9: // SBC nnnn,Y  Subtract Absolute,Y     A=A+C-1-[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         SBC();
         cycles = 4; // *
         if ((a1 >> 8) < ((a1 + Y) >> 8)) cycles++;
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xE1: // SBC (nn,X)  Subtract (Indirect,X)   A=A+C-1-[[nn+X]]
         FETCH_INDIRECT_X();
         SBC();
         cycles = 6; //  
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
     case 0xF1: // SBC (nn),Y  Subtract (Indirect),Y   A=A+C-1-[[nn]+Y]
         FETCH_INDIRECT_Y();
         SBC();
         cycles = 5; // *
         if ((a2 >> 8) < ((a2 + X) >> 8)) cycles++;
-        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_A);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_CB(new_A); CALC_FLAG_V(new_T);
         break;
 
         // * Add one cycle if indexing crosses a page boundary.
@@ -789,19 +798,19 @@ int Cpu::Step()
         break;
     case 0xC0: // CPY #nn     Compare Y with Immediate     Y-nn
         FETCH_IMMEDIATE(); // #nn
-        new_T = X - p1;
+        new_T = Y - p1;
         cycles = 2; //  
         CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_CB(new_T);
         break;
     case 0xC4: // CPY nn      Compare Y with Zero Page     Y-[nn]
         FETCH_ZERO_PAGE(); // nn
-        new_T = X - p1;
+        new_T = Y - p1;
         cycles = 3; //  
         CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_CB(new_T);
         break;
     case 0xCC: // CPY nnnn    Compare Y with Absolute      Y-[nnnn]
         FETCH_ABSOLUTE();
-        new_T = X - p1;
+        new_T = Y - p1;
         cycles = 4; //  
         CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_CB(new_T);
         break;
@@ -1040,7 +1049,7 @@ int Cpu::Step()
         p1 = A; // A
         new_A = (p1 >> 1) | (FLAG_C << 7);
         cycles = 2; //  
-        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); SET_FLAG_C(p1 & 1);
         break;
     case 0x66: // ROR nn      Rotate Right Zero Page   RCR [nn]
         a1 = Fetch();
@@ -1048,7 +1057,7 @@ int Cpu::Step()
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 5; //  
-        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); SET_FLAG_C(p1 & 1);
         break;
     case 0x76: // ROR nn,X    Rotate Right Zero Page,X RCR [nn+X]
         a1 = (Fetch() + X) & 0xFF;
@@ -1056,14 +1065,14 @@ int Cpu::Step()
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 6; //  
-        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); SET_FLAG_C(p1 & 1);
         break;
     case 0x6E: // ROR nnnn    Rotate Right Absolute    RCR [nnnn]
         FETCH_ABSOLUTE();
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 6; //  
-        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); SET_FLAG_C(p1 & 1);
         break;
     case 0x7E: // ROR nnnn,X  Rotate Right Absolute,X  RCR [nnnn+X]
         ADDR_ABSOLUTE(); // nnnn,X
@@ -1072,7 +1081,7 @@ int Cpu::Step()
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 7; //  
-        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); SET_FLAG_C(p1 & 1);
         break;
 
 
@@ -1108,7 +1117,7 @@ int Cpu::Step()
 
         break;
     case 0x40: // RTI         Return from BRK/IRQ/NMI    P=[S], PC=[S]
-        P = (Pop() & 0xCF) | 0x30;
+        P = (Pop() & 0xCF) | 0x20;
         PC = Pop() | (Pop() << 8);
         cycles = 6; //  
         break;
@@ -1505,7 +1514,7 @@ int Cpu::Step()
     A = (u8)new_A;
     X = (u8)new_X;
     Y = (u8)new_Y;
-
+    
     if (opcode != 0xEA)
     {
         if (ShowDebug >= 2) printf("\t\t\tOP %02x: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x(Z=%d/C=%d/N=%d/V=%d)\n", opcode, PC, A, X, Y, P, FLAG_Z, FLAG_C, FLAG_N, FLAG_V);

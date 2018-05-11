@@ -82,6 +82,7 @@ public:
 	virtual u8   ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
+    virtual void SoftReset();
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
@@ -131,6 +132,7 @@ public:
 	virtual u8   ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
+    virtual void SoftReset();
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();

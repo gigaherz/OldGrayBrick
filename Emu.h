@@ -29,6 +29,7 @@ public:
 	void Init(char *romFile);
 	void Close();
 	void Reset();
+    void SoftReset();
 	void Start();
 	void Stop();
 
@@ -52,6 +53,7 @@ public:
 
 	void Init();
 	void Reset();
+    void SoftReset();
 	void Close();
 
 	void Write(u16 addr, u8 value);
@@ -71,6 +73,7 @@ public:
 	virtual void Init()=0;
 	virtual void Reset()=0;
 	virtual void Close()=0;
+    virtual void SoftReset() = 0;
 
 	virtual void Emulate(u32 clocks)=0;
 
@@ -118,6 +121,7 @@ public:
 
 	void Init();
 	void Reset();
+    void SoftReset();
 	void Close();
 
 	void Stall(int cycles);
@@ -164,6 +168,7 @@ public:
 
 	void Init(int mode);
 	void Reset();
+    void SoftReset();
 	void Close();
 
 	void Emulate(u32 clocks);
@@ -185,6 +190,7 @@ public:
 
 	void Init(int vmode, s32 output_sample_rate);
 	void Reset();
+    void SoftReset();
 	void Close();
 
 	void Emulate(u32 clocks); //APU clock rate = 1789800Hz (DDR'd)

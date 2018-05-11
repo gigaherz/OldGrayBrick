@@ -84,6 +84,15 @@ void Core::Reset()
 	}
 }
 
+void Core::SoftReset()
+{
+    memory->SoftReset();
+    mapper->SoftReset();
+    cpu->SoftReset();
+    ppu->SoftReset();
+    apu->SoftReset();
+}
+
 void Core::Stop()
 {
 	running=false;
@@ -102,7 +111,7 @@ void Core::Emulate()
 	{
 		int cycles = cpu->Step();
 		ppu->Emulate(cycles);
-		//apu->Emulate(cycles);
+		apu->Emulate(cycles);
 
 		maxCycles -= cycles;
 

@@ -151,6 +151,11 @@ void Apu::Reset()
 	State.ResetCounter=1024;
 }
 
+void Apu::SoftReset()
+{
+    State.ResetCounter = 1024;
+}
+
 void Apu::Init(int vmode, s32 output_sample_rate)
 {
 	Reset();

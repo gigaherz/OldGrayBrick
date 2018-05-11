@@ -240,6 +240,10 @@ void Mapper1::Reset()
 {
 }
 
+void Mapper1::SoftReset()
+{
+}
+
 void Mapper1::Close()
 {
 }

@@ -103,6 +103,10 @@ void Mapper0::Reset()
 {
 }
 
+void Mapper0::SoftReset()
+{
+}
+
 void Mapper0::Close()
 {
 }

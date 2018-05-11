@@ -47,6 +47,7 @@ struct MenuItem {
 		{    2,  201, MenuItem::Type_Normal, "Start" },
 		{    2,  202, MenuItem::Type_Normal, "Stop" },
 		{    2,  203, MenuItem::Type_Normal, "Reset" },
+        {    2,  204, MenuItem::Type_Normal, "Simulate Reset Button" },
 	{   0,   3, MenuItem::Type_Popup, "Options" },
 		{    3,  301, MenuItem::Type_Normal, "Limit Speed" },
 		{    3,  302, MenuItem::Type_Separator, "" },
@@ -188,6 +189,9 @@ void HandleMenuClick(HWND hWnd, int menuId)
 	case 203:
 		core->Reset();
 		break;
+    case 204:
+        core->SoftReset();
+        break;
 
 		//just for fun
 	case 301:
