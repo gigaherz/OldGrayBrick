@@ -131,6 +131,9 @@ public:
 
 	void NMI();
 	void Interrupt();
+
+    u8 MemoryRead8(int addr);
+    void MemoryWrite8(int addr, u8 value);
 };
 
 class Ppu

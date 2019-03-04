@@ -75,21 +75,33 @@ void Cpu::SoftReset()
     PC = /*0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
 }
 
+u8 Cpu::MemoryRead8(int addr)
+{
+    totalCycles += 3;
+    return memory->Read(addr);
+}
+
+void Cpu::MemoryWrite8(int addr, u8 value)
+{
+    totalCycles += 3;
+    return memory->Write(addr, value);
+}
+
 void Cpu::Push(u8 value)
 {
-    memory->Write(0x100 + S, value);
+    MemoryWrite8(0x100 + S, value);
     S--;
 }
 
 u8   Cpu::Pop()
 {
     S++;
-    return memory->Read(0x100 + S);
+    return MemoryRead8(0x100 + S);
 }
 
 u8   Cpu::Fetch()
 {
-    u8 value = memory->Read(PC);
+    u8 value = MemoryRead8(PC);
     PC += 1;
     return value;
 }
@@ -109,7 +121,7 @@ void Cpu::NMI()
     Push(PC >> 8);
     Push((u8)PC);
     Push(P & 0xDF);
-    PC = memory->Read(0xFFFA) | (memory->Read(0xFFFB) << 8);;
+    PC = MemoryRead8(0xFFFA) | (MemoryRead8(0xFFFB) << 8);;
     SET_FLAG_I(1);
 }
 
@@ -129,16 +141,16 @@ int Cpu::Step()
         Push(PC >> 8);
         Push((u8)PC);
         Push(P & 0xDF);
-        PC = memory->Read(0xFFFE) | (memory->Read(0xFFFF) << 8);
+        PC = MemoryRead8(0xFFFE) | (MemoryRead8(0xFFFF) << 8);
         SET_FLAG_I(1);
     }
 
     //printf("PREV.: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x\n",PC,A,X,Y,P);
 
     int old_PC = PC;
-    int old_M0 = memory->Read(PC + 0);
-    int old_M1 = memory->Read(PC + 1);
-    int old_M2 = memory->Read(PC + 2);
+    int old_M0 = MemoryRead8(PC + 0);
+    int old_M1 = MemoryRead8(PC + 1);
+    int old_M2 = MemoryRead8(PC + 2);
 
     if (ShowDebug >= 1)
     {
@@ -158,7 +170,7 @@ int Cpu::Step()
 
     bool cond = false;
 
-    int cycles = 2;
+    int _cycles = 2;
 
 #define SIGN_EXTEND(a) ((s32)(s8)(a))
 
@@ -167,21 +179,21 @@ int Cpu::Step()
 #define ADDR_ZERO_PAGE_Y() a1 = (Fetch() + Y) & 0xFF
 #define ADDR_ABSOLUTE() a1 = Fetch() | (((u16)Fetch()) << 8)
 #define ADDR_ABSOLUTE_OFF(off) a1 = (Fetch() | (((u16)Fetch()) << 8)) + off
-#define ADDR_INDIRECT_X() a1 = Fetch() + X; a2 = memory->Read(a1 & 0xFF) | (((u16)memory->Read((a1 + 1) & 0xFF)) << 8)
-#define ADDR_INDIRECT() a1 = Fetch(); a2 = memory->Read(a1) | (((u16)memory->Read((a1 + 1)&0xFF)) << 8)
+#define ADDR_INDIRECT_X() a1 = Fetch() + X; a2 = MemoryRead8(a1 & 0xFF) | (((u16)MemoryRead8((a1 + 1) & 0xFF)) << 8)
+#define ADDR_INDIRECT() a1 = Fetch(); a2 = MemoryRead8(a1) | (((u16)MemoryRead8((a1 + 1)&0xFF)) << 8)
 
 #define FETCH_IMMEDIATE() p1 = Fetch()
-#define FETCH_ZERO_PAGE()   ADDR_ZERO_PAGE(); p1 = memory->Read(a1)
-#define FETCH_ZERO_PAGE_X() ADDR_ZERO_PAGE_X(); p1 = memory->Read(a1)
-#define FETCH_ZERO_PAGE_Y() ADDR_ZERO_PAGE_Y(); p1 = memory->Read(a1)
-#define FETCH_ABSOLUTE()    ADDR_ABSOLUTE(); p1 = memory->Read(a1)
-#define FETCH_ABSOLUTE_X()  ADDR_ABSOLUTE_OFF(X); p1 = memory->Read(a1)
-#define FETCH_ABSOLUTE_Y()  ADDR_ABSOLUTE_OFF(Y); p1 = memory->Read(a1)
-#define FETCH_INDIRECT_X()  ADDR_INDIRECT_X(); p1 = memory->Read(a2)
-#define FETCH_INDIRECT_Y()  ADDR_INDIRECT(); p1 = memory->Read(a2 + Y)
+#define FETCH_ZERO_PAGE()   ADDR_ZERO_PAGE(); p1 = MemoryRead8(a1)
+#define FETCH_ZERO_PAGE_X() ADDR_ZERO_PAGE_X(); p1 = MemoryRead8(a1)
+#define FETCH_ZERO_PAGE_Y() ADDR_ZERO_PAGE_Y(); p1 = MemoryRead8(a1)
+#define FETCH_ABSOLUTE()    ADDR_ABSOLUTE(); p1 = MemoryRead8(a1)
+#define FETCH_ABSOLUTE_X()  ADDR_ABSOLUTE_OFF(X); p1 = MemoryRead8(a1)
+#define FETCH_ABSOLUTE_Y()  ADDR_ABSOLUTE_OFF(Y); p1 = MemoryRead8(a1)
+#define FETCH_INDIRECT_X()  ADDR_INDIRECT_X(); p1 = MemoryRead8(a2)
+#define FETCH_INDIRECT_Y()  ADDR_INDIRECT(); p1 = MemoryRead8(a2 + Y)
 
-#define STORE_A() memory->Write(a1, A)
-#define STORE_T() memory->Write(a1, (u8)new_T)
+#define STORE_A() MemoryWrite8(a1, A)
+#define STORE_T() MemoryWrite8(a1, (u8)new_T)
 
     switch (opcode)
     {
@@ -193,32 +205,26 @@ int Cpu::Step()
 
     case 0x98: // TYA         Transfer Y to Accumulator    
         new_A = Y;
-        cycles = 2; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xA8: // TAY         Transfer Accumulator to Y    
         new_Y = A;
-        cycles = 2; //  
         CALC_FLAG_N(new_Y); CALC_FLAG_Z(new_Y);
         break;
 
     case 0x8A: // TXA         Transfer X to Accumulator    
-        new_A = X;
-        cycles = 2; //  
+        new_A = X;  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x9A: // TXS         Transfer X to Stack pointer  
         S = X;
-        cycles = 2; //  
         break;
     case 0xAA: // TAX         Transfer Accumulator to X    
         new_X = A;
-        cycles = 2; //  
         CALC_FLAG_N(new_X); CALC_FLAG_Z(new_X);
         break;
     case 0xBA: // TSX         Transfer Stack pointer to X  
         new_X = S;
-        cycles = 2; //  
         CALC_FLAG_N(new_X); CALC_FLAG_Z(new_X);
         break;
 
@@ -227,45 +233,36 @@ int Cpu::Step()
     case 0xA9: // LDA #nn     Load A with Immediate     A=nn
         FETCH_IMMEDIATE(); // #nn
         new_A = p1;
-        cycles = 2; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xA5: // LDA nn      Load A with Zero Page     A=[nn]
         FETCH_ZERO_PAGE(); // nn
         new_A = p1;
-        cycles = 3; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xB5: // LDA nn,X    Load A with Zero Page,X   A=[nn+X]
         FETCH_ZERO_PAGE_X(); // nn,X
         new_A = p1;
-        cycles = 4; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xAD: // LDA nnnn    Load A with Absolute      A=[nnnn]
         FETCH_ABSOLUTE();
         new_A = p1;
-        cycles = 4; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xBD: // LDA nnnn,X  Load A with Absolute,X    A=[nnnn+X]
         FETCH_ABSOLUTE_X();
         new_A = p1;
-        cycles = 4; // *
-        if ((a1 >> 8) != ((a1 + X) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xB9: // LDA nnnn,Y  Load A with Absolute,Y    A=[nnnn+Y]
         FETCH_ABSOLUTE_Y();
         new_A = p1;
-        cycles = 4; // *
-        if ((a1 >> 8) != ((a1 + Y) >> 8)) cycles++;
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xA1: // LDA (nn,X)  Load A with (Indirect,X)  A=[WORD[nn+X]]
         FETCH_INDIRECT_X();
         new_A = p1;
-        cycles = 6; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xB1: // LDA (nn),Y  Load A with (Indirect),Y  A=[WORD[nn]+Y]
@@ -359,52 +356,52 @@ int Cpu::Step()
         break;
     case 0x9D: // STA nnnn,X  Store A in Absolute,X    [nnnn+X]=A
         ADDR_ABSOLUTE(); // nnnn,X
-        memory->Write(a1 + X, A);
+        MemoryWrite8(a1 + X, A);
         cycles = 5; //  
         break;
     case 0x99: // STA nnnn,Y  Store A in Absolute,Y    [nnnn+Y]=A
         ADDR_ABSOLUTE(); // nnnn,Y
-        memory->Write(a1 + Y, A);
+        MemoryWrite8(a1 + Y, A);
         cycles = 5; //  
         break;
     case 0x81: // STA (nn,X)  Store A in (Indirect,X)  [[nn+x]]=A
         ADDR_INDIRECT_X();
-        memory->Write(a2, A);
+        MemoryWrite8(a2, A);
         cycles = 6; //  
         break;
     case 0x91: // STA (nn),Y  Store A in (Indirect),Y  [[nn]+y]=A
         ADDR_INDIRECT();
-        memory->Write(a2 + Y, A);
+        MemoryWrite8(a2 + Y, A);
         cycles = 6; //  
         break;
     case 0x86: // STX nn      Store X in Zero Page     [nn]=X
         ADDR_ZERO_PAGE();
-        memory->Write(a1, X); // nn
+        MemoryWrite8(a1, X); // nn
         cycles = 3; //  
         break;
     case 0x96: // STX nn,Y    Store X in Zero Page,Y   [nn+Y]=X
         ADDR_ZERO_PAGE_Y();
-        memory->Write(a1, X); // nn,Y
+        MemoryWrite8(a1, X); // nn,Y
         cycles = 4; //  
         break;
     case 0x8E: // STX nnnn    Store X in Absolute      [nnnn]=X
         ADDR_ABSOLUTE(); // nnnn
-        memory->Write(a1, X);
+        MemoryWrite8(a1, X);
         cycles = 4; //  
         break;
     case 0x84: // STY nn      Store Y in Zero Page     [nn]=Y
         ADDR_ZERO_PAGE();
-        memory->Write(a1, Y); // nn
+        MemoryWrite8(a1, Y); // nn
         cycles = 3; //  
         break;
     case 0x94: // STY nn,X    Store Y in Zero Page,X   [nn+X]=Y
         ADDR_ZERO_PAGE_X();
-        memory->Write(a1, Y); // nn,X
+        MemoryWrite8(a1, Y); // nn,X
         cycles = 4; //  
         break;
     case 0x8C: // STY nnnn    Store Y in Absolute      [nnnn]=Y
         ADDR_ABSOLUTE(); // nnnn
-        memory->Write(a1, Y);
+        MemoryWrite8(a1, Y);
         cycles = 4; //  
         break;
 
@@ -838,7 +835,7 @@ int Cpu::Step()
 
     case 0xE6: // INC nn      Increment Zero Page    [nn]=[nn]+1
         FETCH_ZERO_PAGE();
-        p1 = memory->Read(a1); // nn
+        p1 = MemoryRead8(a1); // nn
         new_T = p1 + 1;
         STORE_T();
         cycles = 5; //  
@@ -846,7 +843,7 @@ int Cpu::Step()
         break;
     case 0xF6: // INC nn,X    Increment Zero Page,X  [nn+X]=[nn+X]+1
         FETCH_ZERO_PAGE_X();
-        p1 = memory->Read(a1); // nn,X
+        p1 = MemoryRead8(a1); // nn,X
         new_T = p1 + 1;
         STORE_T();
         cycles = 6; //  
@@ -994,7 +991,7 @@ int Cpu::Step()
     case 0x5E: // LSR nnnn,X  Shift Right Absolute,X   SHR [nnnn+X]
         ADDR_ABSOLUTE(); // nnnn,X
         a1 += X;
-        p1 = memory->Read(a1);
+        p1 = MemoryRead8(a1);
         new_T = p1 >> 1;
         STORE_T();
         cycles = 7; //  
@@ -1011,7 +1008,7 @@ int Cpu::Step()
         break;
     case 0x26: // ROL nn      Rotate Left Zero Page    RCL [nn]
         a1 = Fetch();
-        p1 = memory->Read(a1); // nn
+        p1 = MemoryRead8(a1); // nn
         new_T = (p1 << 1) | FLAG_C;
         STORE_T();
         cycles = 5; //  
@@ -1019,7 +1016,7 @@ int Cpu::Step()
         break;
     case 0x36: // ROL nn,X    Rotate Left Zero Page,X  RCL [nn+X]
         a1 = (Fetch() + X) & 0xFF;
-        p1 = memory->Read(a1); // nn,X
+        p1 = MemoryRead8(a1); // nn,X
         new_T = (p1 << 1) | FLAG_C;
         STORE_T();
         cycles = 6; //  
@@ -1035,7 +1032,7 @@ int Cpu::Step()
     case 0x3E: // ROL nnnn,X  Rotate Left Absolute,X   RCL [nnnn+X]
         ADDR_ABSOLUTE(); // nnnn,X
         a1 += X;
-        p1 = memory->Read(a1);
+        p1 = MemoryRead8(a1);
         new_T = (p1 << 1) | FLAG_C;
         STORE_T();
         cycles = 7; //  
@@ -1053,7 +1050,7 @@ int Cpu::Step()
         break;
     case 0x66: // ROR nn      Rotate Right Zero Page   RCR [nn]
         a1 = Fetch();
-        p1 = memory->Read(a1); // nn
+        p1 = MemoryRead8(a1); // nn
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 5; //  
@@ -1061,7 +1058,7 @@ int Cpu::Step()
         break;
     case 0x76: // ROR nn,X    Rotate Right Zero Page,X RCR [nn+X]
         a1 = (Fetch() + X) & 0xFF;
-        p1 = memory->Read(a1); // nn,X
+        p1 = MemoryRead8(a1); // nn,X
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 6; //  
@@ -1077,7 +1074,7 @@ int Cpu::Step()
     case 0x7E: // ROR nnnn,X  Rotate Right Absolute,X  RCR [nnnn+X]
         ADDR_ABSOLUTE(); // nnnn,X
         a1 += X;
-        p1 = memory->Read(a1);
+        p1 = MemoryRead8(a1);
         new_T = (p1 >> 1) | (FLAG_C << 7);
         STORE_T();
         cycles = 7; //  
@@ -1104,7 +1101,7 @@ int Cpu::Step()
     case 0x6C: // JMP (nnnn)  Jump Indirect              PC=WORD[nnnn]
         a1 = Fetch(); // (nnnn)
         a2 = ((u16)Fetch()) << 8;
-        PC = memory->Read(a2 | a1) | (memory->Read(a2 | ((a1 + 1) & 0xFF)) << 8);
+        PC = MemoryRead8(a2 | a1) | (MemoryRead8(a2 | ((a1 + 1) & 0xFF)) << 8);
         cycles = 5; //  
 
         break;
@@ -1229,7 +1226,7 @@ int Cpu::Step()
     case 0x00: // BRK         Force Break B=1 [S]=PC+1,[S]=P,I=1,PC=[FFFE]
         Push((u8)PC);
         Push(PC >> 8);
-        PC = memory->Read(0xFFFE) | (memory->Read(0xFFFF) << 8);
+        PC = MemoryRead8(0xFFFE) | (MemoryRead8(0xFFFF) << 8);
         Push(P | 0x10);
         cycles = 7; //  
         SET_FLAG_I(1);
@@ -1301,23 +1298,23 @@ int Cpu::Step()
 
     case 0x87: // SAX nn      STA+STX  [nn]=A AND X
         a1 = Fetch();
-        memory->Write(a1, A&X); // nn
+        MemoryWrite8(a1, A&X); // nn
         cycles = 3; //  
         break;
     case 0x97: // SAX nn,Y    STA+STX  [nn+Y]=A AND X
         a1 = (Fetch() + Y) & 0xFF;
-        memory->Write(a1, A&X); // nn
+        MemoryWrite8(a1, A&X); // nn
         cycles = 4; //  
         break;
     case 0x8F: // SAX nnnn    STA+STX  [nnnn]=A AND X
         ADDR_ABSOLUTE(); // nnnn
-        memory->Write(a1, A&X); // nn
+        MemoryWrite8(a1, A&X); // nn
         cycles = 4; //  
         break;
     case 0x83: // SAX (nn,X)  STA+STX  [WORD[nn+X]]=A AND X
         a1 = (Fetch() + X) & 0xFF; // (nn,X)
-        a2 = memory->Read(a1) | (((u16)memory->Read(a1 + 1)) << 8);
-        memory->Write(a2, A&X); // nn
+        a2 = MemoryRead8(a1) | (((u16)MemoryRead8(a1 + 1)) << 8);
+        MemoryWrite8(a2, A&X); // nn
         cycles = 6; //  
         break;
     case 0xA7: // LAX nn      LDA+LDX  A,X=[nn]
@@ -1327,7 +1324,7 @@ int Cpu::Step()
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xB7: // LAX nn,Y    LDA+LDX  A,X=[nn+Y]
-        p1 = memory->Read((Fetch() + Y) & 0xFF); // nn,Y
+        p1 = MemoryRead8((Fetch() + Y) & 0xFF); // nn,Y
         new_A = new_X = p1;
         cycles = 4; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
@@ -1346,16 +1343,16 @@ int Cpu::Step()
         break;
     case 0xA3: // LAX (nn,X)  LDA+LDX  A,X=[WORD[nn+X]]
         a1 = Fetch() + X; // (nn,X)
-        a2 = memory->Read(a1) | (((u16)memory->Read(a1 + 1)) << 8);
-        p1 = memory->Read(a2);
+        a2 = MemoryRead8(a1) | (((u16)MemoryRead8(a1 + 1)) << 8);
+        p1 = MemoryRead8(a2);
         new_A = new_X = p1;
         cycles = 6; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0xB3: // LAX (nn),Y  LDA+LDX  A,X=[WORD[nn]+Y]
         a1 = Fetch(); // (nn),Y
-        a2 = memory->Read(a1) | (((u16)memory->Read(a1 + 1)) << 8);
-        p1 = memory->Read(a2 + Y);
+        a2 = MemoryRead8(a1) | (((u16)MemoryRead8(a1 + 1)) << 8);
+        p1 = MemoryRead8(a2 + Y);
         new_A = new_X = p1;
         cycles = 5; // *
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
