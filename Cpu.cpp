@@ -1,6 +1,9 @@
 #include "StdAfx.h"
 #include "Emu.h"
 
+#define DEBUG_MISC 1
+#define DEBUG_DECODED 2
+#define DEBUG_ALL_INSTRUCTIONS 3
 int ShowDebug = 1;
 
 #define SET_FLAG(f,v)	SetFlag(f,(v))
@@ -64,15 +67,16 @@ void Cpu::Reset()
     Y = 0;
     P = 0x24; // 0x34;
     S = 0xFD;
-    PC = 0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
+    PC = memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
     SET_FLAG_I(1);
+    printf("CPU Reset.\n");
 }
 
 void Cpu::SoftReset()
 {
     SET_FLAG_I(1);
     S += 3; // simulate RTI
-    PC = /*0xC000; //*/ memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
+    PC = memory->Read(0xFFFC) | (memory->Read(0xFFFD) << 8);
 }
 
 u8 Cpu::MemoryRead8(int addr)
@@ -128,6 +132,7 @@ void Cpu::NMI()
 // returns the number of clock cycles used by the step
 int Cpu::Step()
 {
+    if (this == nullptr) return 0;
 
     if (stall > 0)
     {
@@ -152,7 +157,7 @@ int Cpu::Step()
     int old_M1 = MemoryRead8(PC + 1);
     int old_M2 = MemoryRead8(PC + 2);
 
-    if (ShowDebug >= 1)
+    if (ShowDebug >= DEBUG_DECODED)
     {
         PrintInstructionInfo1(cpuLog, old_PC, old_M0, old_M1, old_M2);
     }
@@ -170,7 +175,7 @@ int Cpu::Step()
 
     bool cond = false;
 
-    int _cycles = 2;
+    int cycles = 2;
 
 #define SIGN_EXTEND(a) ((s32)(s8)(a))
 
@@ -1496,7 +1501,11 @@ int Cpu::Step()
     case 0xF2:
         core->Stop();
         cycles = 1;
-        MessageBoxEx(hMainWnd, _T("KIL-type instruction found. Execution halted."), _T("ALERT"), MB_OK, 0);
+        printf("KIL-type instruction found: %02x. Execution halted.\n", opcode);
+        //MessageBoxEx(hMainWnd, _T("KIL-type instruction found. Execution halted."), _T("ALERT"), MB_OK, 0);
+        break;
+    case 0xFF:
+        cycles = 1;
         break;
     default:
 
@@ -1514,7 +1523,7 @@ int Cpu::Step()
     
     if (opcode != 0xEA)
     {
-        if (ShowDebug >= 2) printf("\t\t\tOP %02x: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x(Z=%d/C=%d/N=%d/V=%d)\n", opcode, PC, A, X, Y, P, FLAG_Z, FLAG_C, FLAG_N, FLAG_V);
+        if (ShowDebug >= DEBUG_ALL_INSTRUCTIONS) printf("\t\t\tOP %02x: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x(Z=%d/C=%d/N=%d/V=%d)\n", opcode, PC, A, X, Y, P, FLAG_Z, FLAG_C, FLAG_N, FLAG_V);
     }
 
     this->totalCycles += cycles * 3;

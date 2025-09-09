@@ -41,9 +41,17 @@ Mapper  *LoadROM(char *fileName)
 		return new Mapper0(rom,from);
 	case 1:
 		return new Mapper1(rom,from);
+	case 2:
+		return new Mapper2(rom, from);
+	case 3:
+		return new Mapper3(rom, from);
+	case 11:
+		return new Mapper11(rom, from);
 	}
 
-	MessageBoxEx(hMainWnd,_T("Unknown or unimplemented Mappter type."),_T("ERROR"),MB_OK,0);
+	wchar_t msg[512];
+	wsprintf(msg, L"Unknown or unimplemented Mappter type %d.", mapperId);
+	MessageBoxEx(hMainWnd,msg,_T("ERROR"),MB_OK,0);
 	fclose(from);
 	return NULL;
 }

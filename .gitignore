@@ -13,3 +13,4 @@
 *.opendb
 *.rar
 /UpgradeLog*.htm*
+/.vs

@@ -14,18 +14,18 @@
     <ProjectGuid>{1F32B7B2-4A64-45B4-8958-BE9D573315D5}</ProjectGuid>
     <RootNamespace>Yanese</RootNamespace>
     <Keyword>Win32Proj</Keyword>
-    <WindowsTargetPlatformVersion>10.0.17134.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -102,6 +102,9 @@
     <ClCompile Include="Mapper.cpp" />
     <ClCompile Include="Mapper0.cpp" />
     <ClCompile Include="Mapper1.cpp" />
+    <ClCompile Include="Mapper11.cpp" />
+    <ClCompile Include="Mapper2.cpp" />
+    <ClCompile Include="Mapper3.cpp" />
     <ClCompile Include="Mapper4.cpp" />
     <ClCompile Include="Memory.cpp" />
     <ClCompile Include="Pad.cpp" />

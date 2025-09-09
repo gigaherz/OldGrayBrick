@@ -118,11 +118,16 @@ void Mapper1::Write(u16 addr, u8 value)
 	}
 }
 
+static bool mapper1errorprint = false;
 u8   Mapper1::Read (u16 addr)
 {
 	if(addr<0x8000)
 	{
-		printf("Unhandled read from mapper0 addr 0x%04x",addr);
+		if (!mapper1errorprint)
+		{
+			mapper1errorprint = true;
+			printf("Unhandled read from mapper1 addr 0x%04x", addr);
+		}
 		return 0xA5;
 	}
 	else 
@@ -209,12 +214,12 @@ u8   Mapper1::ReadPPU(u16 addr)
 			return VROM[addr&vrom_mask];
 
 		if(!vrom_mode)
-			return VROM[addr+(vrom_offset0<<13)];
+			return VROM[(addr+(vrom_offset0<<13))& vrom_mask];
 
 		if(addr<0x1000)
-			return VROM[addr+(vrom_offset0<<12)];
+			return VROM[(addr+(vrom_offset0<<12))& vrom_mask];
 
-		return VROM[addr-0x1000+(vrom_offset1<<12)];
+		return VROM[(addr-0x1000+(vrom_offset1<<12))&vrom_mask];
 	}
 	else
 	{

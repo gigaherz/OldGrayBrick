@@ -38,11 +38,16 @@ void Mapper0::Write(u16 addr, u8 value)
 	printf("WARNING: Write to PROM[0x%04x]=0x%02x\n",addr,value);
 }
 
+static bool mapper0errorprint = false;
 u8   Mapper0::Read (u16 addr)
 {
 	if(addr<0x8000)
 	{
-		printf("Unhandled read from mapper0 addr 0x%04x",addr);
+		if (!mapper0errorprint)
+		{
+			mapper0errorprint = true;
+			printf("Unhandled read from mapper0 addr 0x%04x",addr);
+		}
 		return 0xA5;
 	}
 	else {

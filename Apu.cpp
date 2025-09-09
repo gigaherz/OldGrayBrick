@@ -154,6 +154,12 @@ void Apu::Reset()
 void Apu::SoftReset()
 {
     State.ResetCounter = 1024;
+	State.StatusReg &= 0x3F;
+	State.Channels[0].LengthCounter = 0;
+	State.Channels[1].LengthCounter = 0;
+	State.Channels[2].LengthCounter = 0;
+	State.Channels[3].LengthCounter = 0;
+	State.Channel5_DMALength = 0;
 }
 
 void Apu::Init(int vmode, s32 output_sample_rate)
@@ -386,6 +392,12 @@ void Apu::Write(u16 addr, u8 value)
 		if(!State.FrameIRQEnable)
 		{
 			State.StatusReg&=0xBF;
+		}
+
+		// TODO: TEST AND FIX, THIS MAY BE WRONG
+		if (value & 0x80)
+		{
+			Emulate(1);
 		}
 		break;
 

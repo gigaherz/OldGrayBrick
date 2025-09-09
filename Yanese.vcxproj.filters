@@ -60,6 +60,15 @@
     <ClCompile Include="Mapper4.cpp">
       <Filter>Source Files\Mappers</Filter>
     </ClCompile>
+    <ClCompile Include="Mapper2.cpp">
+      <Filter>Source Files\Mappers</Filter>
+    </ClCompile>
+    <ClCompile Include="Mapper3.cpp">
+      <Filter>Source Files\Mappers</Filter>
+    </ClCompile>
+    <ClCompile Include="Mapper11.cpp">
+      <Filter>Source Files\Mappers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Emu.h">

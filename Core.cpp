@@ -39,6 +39,9 @@ void Core::Init(char *romFile)
 	apu->Init(mapper->VMode(),48000);
 	pad->Init();
 	isInit=true;
+
+	Reset();
+	Start();
 }
 
 void Core::Close()
@@ -107,9 +110,10 @@ void Core::Emulate()
 	}
 
 	int maxCycles = 10000;
-	while(maxCycles>0)
+	while(maxCycles>0 && running)
 	{
 		int cycles = cpu->Step();
+		if (cycles == 0) break;
 		ppu->Emulate(cycles);
 		apu->Emulate(cycles);
 
@@ -123,7 +127,7 @@ void Core::Emulate()
 
 		if(!running)
 		{
-			printf("Core stopped.");
+			printf("Core stopped.\n");
 			break;
 		}
 	}

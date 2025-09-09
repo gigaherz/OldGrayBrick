@@ -2,6 +2,8 @@
 #include "Emu.h"
 #include "Mapper.h"
 
+static bool mapper4errorprint = false;
+
 class Mapper4: public Mapper
 {
 private:
@@ -87,11 +89,16 @@ public:
 		}
 	}
 
+	
 	virtual u8   Read (u16 addr)
 	{
 		if(addr<0x8000)
 		{
-			printf("Unhandled read from mapper0 addr 0x%04x",addr);
+			if (!mapper4errorprint)
+			{
+				mapper4errorprint = true;
+				printf("Unhandled read from mapper1 addr 0x%04x", addr);
+			}
 			return 0xA5;
 		}
 		else {

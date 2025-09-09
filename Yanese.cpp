@@ -260,9 +260,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	wc.hCursor			= LoadCursor(NULL, IDC_ARROW);
 	RegisterClassEx( &wc );
 
+	NONCLIENTMETRICS ncm = { sizeof(NONCLIENTMETRICS), 0 };
+	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &ncm, 0);
+
 	// Create the application's window
 	hWnd = CreateWindow(_T("DrawingWnd"),_T("YaNESe"),
-		WS_OVERLAPPEDWINDOW, 0, 0, WIDTH+32, HEIGHT+48,
+		WS_OVERLAPPEDWINDOW, 0, 0, WIDTH*3+ncm.iBorderWidth*2, HEIGHT*3+ncm.iBorderWidth*2+ncm.iCaptionHeight+ncm.iMenuHeight,
 		GetDesktopWindow(), NULL, wc.hInstance, NULL );
 
 	// Show the window

@@ -6,9 +6,6 @@
 HWND hWnd;
 BITMAPINFO bmi;
 
-#define HEIGHT 240
-#define WIDTH  256
-
 unsigned int X=0;
 unsigned int Y=0;
 
@@ -16,7 +13,7 @@ int button;
 int frames;
 int ticks;
 
-u32 buffer[256*240];
+u32 buffer[WIDTH*HEIGHT];
 
 class GDIDisplay: public Display
 {
