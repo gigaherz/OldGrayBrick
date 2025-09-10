@@ -57,7 +57,7 @@ void Mapper2::Write(u16 addr, u8 value)
 }
 
 static bool Mapper2errorprint = false;
-u8   Mapper2::Read (u16 addr)
+int Mapper2::Read (u16 addr)
 {
 	if(addr<0x8000)
 	{
@@ -66,7 +66,7 @@ u8   Mapper2::Read (u16 addr)
 			Mapper2errorprint = true;
 			printf("Unhandled read from Mapper2 addr 0x%04x", addr);
 		}
-		return 0xA5;
+		return -1; // 0xA5;
 	}
 	else if (addr < 0xC000)
 	{
@@ -104,7 +104,7 @@ void Mapper2::WritePPU(u16 addr, u8 value)
 	}
 }
 
-u8   Mapper2::ReadPPU(u16 addr)
+int Mapper2::ReadPPU(u16 addr)
 {
 	if (addr < 0x2000)
 	{

@@ -10,8 +10,13 @@ Memory::~Memory(void)
 {
 }
 
+
+
 void Memory::Write(u16 addr, u8 value)
 {
+	OpenBusValue = value;
+	OpenBusLifetime = 20;
+
 	if(addr<0x2000) // 0000h-07FFh   Internal 2K Work RAM (mirrored to 800h-1FFFh)
 	{
 		WorkRam[addr&0x7ff] = value;
@@ -41,26 +46,32 @@ void Memory::Write(u16 addr, u8 value)
 
 u8   Memory::Read (u16 addr)
 {
+	int ret = -1;
 	if(addr<0x2000) // 0000h-07FFh   Internal 2K Work RAM (mirrored to 800h-1FFFh)
 	{
-		return WorkRam[addr&0x7ff];
+		ret = WorkRam[addr&0x7ff];
 	}
 	else if(addr<0x4000) // 2000h-2007h   Internal PPU Registers (mirrored to 2008h-3FFFh)
 	{
-		return ppu->Read(addr&0x7);
+		ret = ppu->Read(addr&0x7);
 	}
 	else if(addr<0x4018) // 4000h-4017h   Internal APU Registers
 	{
-		if(addr==0x4014)
-			return ppu->Read(addr);
-
-		if(addr==0x4016)
-			return pad->Poll(0);
-
-		if(addr==0x4017)
-			return pad->Poll(1);
-
-		return apu->Read(addr);
+		switch (addr)
+		{
+		case 0x4014:
+			ret = ppu->Read(addr);
+			break;
+		case 0x4016:
+			ret = pad->Poll(0);
+			break;
+		case 0x4017:
+			ret = pad->Poll(1);
+			break;
+		default:
+			ret = apu->Read(addr);
+			break;
+		}
 	}
 	else
 	{
@@ -69,6 +80,25 @@ u8   Memory::Read (u16 addr)
 		// 8000h-FFFFh   Cartridge PRG-ROM Area 32K
 		return mapper->Read(addr);
 	}
+
+	if (ret < 0)
+	{
+		if (OpenBusLifetime > 0)
+		{
+			OpenBusLifetime--;
+			ret = OpenBusValue;
+		}
+		else
+		{
+			ret = 0;
+		}
+	}
+	else
+	{
+		OpenBusValue = ret;
+		OpenBusLifetime = 20;
+	}
+	return ret;
 }
 
 void Memory::Reset()

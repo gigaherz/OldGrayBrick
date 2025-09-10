@@ -33,6 +33,7 @@ unsigned char ppu_palette[][3] = {
 
 Ppu::Ppu(void)
 {
+	memset(debug, 0x5A, sizeof(debug));
 }
 
 Ppu::~Ppu(void)
@@ -68,59 +69,60 @@ void Ppu::Init(int mode) // ntsc/pal -> ntsc = shows only 224 lines isntead of 2
 
 void Ppu::Reset()
 {
-	memset(vram,0,sizeof(vram));
-	memset(pal_ram,0,sizeof(pal_ram));
-	memset(spr,0,sizeof(spr));
+	memset(vram, 0, sizeof(vram));
+	memset(pal_ram, 0, sizeof(pal_ram));
+	memset(spr, 0, sizeof(spr));
+	memset(sprites, 0, sizeof(sprites));
 
-  //3F00h        Background Color (Color 0)
-	pal_ram[ 0] = PAL_LUMA_0 | PAL_CHROMA_BLACK1;
-  //3F01h-3F03h  Background Palette 0 (Color 1-3)
-	pal_ram[ 1] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
-	pal_ram[ 2] = PAL_LUMA_1 | PAL_CHROMA_WHITE;
-	pal_ram[ 3] = PAL_LUMA_3 | PAL_CHROMA_WHITE;
-  //3F05h-3F07h  Background Palette 1 (Color 1-3)
-	pal_ram[ 5] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
-	pal_ram[ 6] = PAL_LUMA_1 | PAL_CHROMA_WHITE;
-	pal_ram[ 7] = PAL_LUMA_3 | PAL_CHROMA_WHITE;
-  //3F09h-3F0Bh  Background Palette 2 (Color 1-3)
-	pal_ram[ 9] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
+	SoftReset();
+}
+
+void Ppu::SoftReset()
+{
+	//3F00h        Background Color (Color 0)
+	pal_ram[0] = PAL_LUMA_0 | PAL_CHROMA_BLACK1;
+	//3F01h-3F03h  Background Palette 0 (Color 1-3)
+	pal_ram[1] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
+	pal_ram[2] = PAL_LUMA_1 | PAL_CHROMA_WHITE;
+	pal_ram[3] = PAL_LUMA_3 | PAL_CHROMA_WHITE;
+	//3F05h-3F07h  Background Palette 1 (Color 1-3)
+	pal_ram[5] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
+	pal_ram[6] = PAL_LUMA_1 | PAL_CHROMA_WHITE;
+	pal_ram[7] = PAL_LUMA_3 | PAL_CHROMA_WHITE;
+	//3F09h-3F0Bh  Background Palette 2 (Color 1-3)
+	pal_ram[9] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
 	pal_ram[10] = PAL_LUMA_1 | PAL_CHROMA_WHITE;
 	pal_ram[11] = PAL_LUMA_3 | PAL_CHROMA_WHITE;
-  //3F0Dh-3F0Fh  Background Palette 3 (Color 1-3)
+	//3F0Dh-3F0Fh  Background Palette 3 (Color 1-3)
 	pal_ram[13] = PAL_LUMA_2 | PAL_CHROMA_GRAY;
 	pal_ram[14] = PAL_LUMA_1 | PAL_CHROMA_WHITE;
 	pal_ram[15] = PAL_LUMA_3 | PAL_CHROMA_WHITE;
-  //3F11h-3F13h  Sprite Palette 0 (Color 1-3)
+	//3F11h-3F13h  Sprite Palette 0 (Color 1-3)
 	pal_ram[17] = PAL_LUMA_1 | PAL_CHROMA_YELLOW;
 	pal_ram[18] = PAL_LUMA_2 | PAL_CHROMA_YELLOW;
 	pal_ram[19] = PAL_LUMA_3 | PAL_CHROMA_YELLOW;
-  //3F15h-3F17h  Sprite Palette 1 (Color 1-3)
+	//3F15h-3F17h  Sprite Palette 1 (Color 1-3)
 	pal_ram[21] = PAL_LUMA_1 | PAL_CHROMA_BLUE;
 	pal_ram[22] = PAL_LUMA_2 | PAL_CHROMA_BLUE;
 	pal_ram[23] = PAL_LUMA_3 | PAL_CHROMA_BLUE;
-  //3F19h-3F1Bh  Sprite Palette 2 (Color 1-3)
+	//3F19h-3F1Bh  Sprite Palette 2 (Color 1-3)
 	pal_ram[25] = PAL_LUMA_1 | PAL_CHROMA_GREEN;
 	pal_ram[26] = PAL_LUMA_2 | PAL_CHROMA_GREEN;
 	pal_ram[27] = PAL_LUMA_3 | PAL_CHROMA_GREEN;
-  //3F1Dh-3F1Fh  Sprite Palette 3 (Color 1-3)
+	//3F1Dh-3F1Fh  Sprite Palette 3 (Color 1-3)
 	pal_ram[29] = PAL_LUMA_1 | PAL_CHROMA_RED;
 	pal_ram[30] = PAL_LUMA_2 | PAL_CHROMA_RED;
 	pal_ram[31] = PAL_LUMA_3 | PAL_CHROMA_RED;
 
 	tClocks = 0;
-	scanline=0;
-	ctrl1=0;
-	ctrl2=0;
-	scroll1=0;
-	scroll2=0;
-	spr_addr=0;
-	vram_addr=0;
-	status=0;
-}
-
-void Ppu::SoftReset()
-{
-    Reset();
+	scanline = 0;
+	ctrl = 0;
+	mask = 0;
+	scroll1 = 0;
+	scroll2 = 0;
+	spr_addr = 0;
+	vram_addr = 0;
+	status = 0;
 }
 
 
@@ -128,6 +130,7 @@ void Ppu::Close()
 {
 }
 
+static bool dbg_sp;
 void Ppu::Emulate(u32 clocks)
 {
 	//Item              NTSC             PAL
@@ -142,6 +145,7 @@ void Ppu::Emulate(u32 clocks)
 
 	int scanline_last;
 
+	int pixel_clock = 341; // TODO: per-pixel emulation
 
 	// accumulate clocks
 	if(vmode) // PAL
@@ -168,23 +172,24 @@ void Ppu::Emulate(u32 clocks)
 
 		if((scanline>20)&&(scanline<261))
 		{
-			int sprites_address = (ctrl1&0x08)<<9; // 0x0000/0x1000 
-			int pattern_address = (ctrl1&0x10)<<8; // 0x0000/0x1000 
+			int sprites_address = (ctrl & 0x08)<<9; // 0x0000/0x1000 
+			int pattern_address = (ctrl & 0x10)<<8; // 0x0000/0x1000 
+			bool tall_sprites = (ctrl & 0x60) != 0;
+			int sprite_height = tall_sprites ? 16 : 8;
 
-			int spr_layer = (ctrl2&0x10)>>8;
-			int bg_layer = (ctrl2&0x08)>>7;
-			int spr_clip = (ctrl2&0x04)>>1;
-			int bg_clip = (ctrl2&0x02)>>2;
-			int bg_mono = (ctrl2&0x01);
+			int spr_layer = (mask&0x10)>>8;
+			int bg_layer = (mask&0x08)>>7;
+			int spr_clip = (mask&0x04)>>1;
+			int bg_clip = (mask&0x02)>>2;
+			int bg_mono = (mask&0x01);
 
-			int x_scroll = scroll1 + (ctrl1&1)*256;
-			int y_scroll = (ctrl1&2)*120; // 240 = 2*120
+			int x_scroll = scroll1 + (ctrl&1)*256;
+			int y_scroll = (ctrl&2)*120; // 240 = 2*120
 
 			if(scroll2>=240)
 				y_scroll += 240-scroll2;
 			else
 				y_scroll += scroll2;
-
 
 			int y_pos = scanline-21;
 			int y_offset = (y_pos + y_scroll);
@@ -197,9 +202,14 @@ void Ppu::Emulate(u32 clocks)
 
 			int attr_y = (y_off>>2);
 
-#define PIXEL_BASED 1
-#ifdef PIXEL_BASED
+
 			int pixels[256];
+
+			// cycles 1 - 64: clear secondary oam
+			/*for (int i = 0; i < 8*4; i++)
+			{
+				sprites[i] = 0xFF;
+			}*/
 
 			for(int x=0;x<256;x++)
 			{
@@ -218,8 +228,9 @@ void Ppu::Emulate(u32 clocks)
 				int name_addr = name_offset + tile_number;
 				int name = ReadPPU(name_addr);
 
-				int pattern0 = ReadPPU(pattern_address + name*16 + 0 + y_pixel);
-				int pattern1 = ReadPPU(pattern_address + name*16 + 8 + y_pixel);
+				int pattern_addr = pattern_address + name * 16 + y_pixel;
+				int pattern0 = ReadPPU(pattern_addr);
+				int pattern1 = ReadPPU(pattern_addr + 8);
 
 				int attr_x = (x_off>>2); // 32tiles=>5 bits. 5-2 = 3 bits
 
@@ -243,213 +254,160 @@ void Ppu::Emulate(u32 clocks)
 					pal = ReadPPU(0x3F00 + 4*attr + color);
 				}
 
-				int r = min(255,((int)ppu_palette[pal][0]*(256 + 32*((ctrl2>>6)&1)))>>8);
-				int g = min(255,((int)ppu_palette[pal][1]*(256 + 32*((ctrl2>>5)&1)))>>8);
-				int b = min(255,((int)ppu_palette[pal][2]*(256 + 32*((ctrl2>>7)&1)))>>8);
+				for (int i = 0; i < 8; i++)
+				{
+					int s_ypos = sprites[i * 4];
+					int s_idx = sprites[i * 4 + 1];
+					int s_attr = sprites[i * 4 + 2];
+					int s_xpos = sprites[i * 4 + 3];
+
+					int priority = s_attr & 0x20;
+
+					int s_ypixel = y_pos - s_ypos - 1; // sprite data is drawn the next scanline after it's found -> y=0 draws at y=1
+					if (s_ypixel >= 0 && s_ypixel < sprite_height && (i == 0 || priority == 0 || color == 0))
+					{
+						int s_xpixel = s_xpos - x + 8;
+						if (s_xpixel >= 0 && s_xpixel < 8)
+						{
+							int bank_addr = tall_sprites ? (s_idx & 1) << 12 : sprites_address;
+							int tile = tall_sprites ? s_idx & 0xFE : s_idx;
+							int s_pal = s_attr & 0x03 + 4;
+							int hflip = s_attr & 0x40;
+							int vflip = s_attr & 0x80;
+
+							int rownum = vflip ? (sprite_height - s_ypixel - 1) : s_ypixel;
+							int colnum = hflip ? (7 - s_xpixel) : s_xpixel;
+
+							int rowaddr = bank_addr + tile * 16 + rownum;
+							int s_row0 = (ReadPPU(rowaddr) >> colnum) & 1;
+							int s_row1 = (ReadPPU(rowaddr + 8) >> colnum) & 1;
+
+							int s_color = s_row0 | (s_row1 <<1);
+
+							if (s_color > 0)
+							{
+								if (i == 0 && color > 0)
+								{
+									// TODO: mark sprite 0 hit
+									status |= 0x20;
+								}
+								if (priority == 0 || color == 0)
+								{
+									color = s_color;
+									pal = ReadPPU(0x3F00 + 4 * s_pal + s_color);
+									break;
+								}
+							}
+						}
+					}
+				}
+
+				pal &= 63;
+
+				int r = min(255,((int)ppu_palette[pal][0]*(256 + 32*((mask>>6)&1)))>>8);
+				int g = min(255,((int)ppu_palette[pal][1]*(256 + 32*((mask>>5)&1)))>>8);
+				int b = min(255,((int)ppu_palette[pal][2]*(256 + 32*((mask>>7)&1)))>>8);
 
 				pixels[x] = b | (g<<8) | (r<<16);
 			}
 			display->SetScanline(y_pos,pixels);
-#else
-			// will render the whole scanline tile by tile, and then compensate for the offset
-			int scan[256+16];
 
-			int first_tile = x_scroll>>3;
-			
-			for(int x=0;x<33;x++)
+			//// sprites for next scanline
+			for (int i = 0; i < 8*4; i++)
 			{
-				int x_tile = first_tile+x;
-				int x_offset = x_tile*8;
-
-				int table_x = x_offset>>8;
-				int x_off = (x_tile&31);
-
-				int name_offset = 0x2000; // + ((table_x&1)<<10) + ((table_y&1)<<11);
-
-				int tile_number = ((y_off*32) + x_off);
-
-				int name_addr = name_offset + tile_number;
-				int name = ReadPPU(name_addr);
-
-				int pattern0 = ReadPPU(pattern_address + name*16 + 0 + y_pixel);
-				int pattern1 = ReadPPU(pattern_address + name*16 + 8 + y_pixel);
-
-				int attr_x = (x_off>>2); // 32tiles=>5 bits. 5-2 = 3 bits
-
-				int attribute_addr = name_offset + 0x03c0 + ((attr_y<<3) + attr_x);
-				int attribute = ReadPPU(attribute_addr);
-				int attr_sel = ((y_tile&2)<<1)+(x_tile&2);
-				int attr = (attribute>>attr_sel)&3;
-
-				int *ts = scan+(x*8);
-
-				for(int x_pixel=0;x_pixel<8;x_pixel++)
+				sprites[i] = 0xFF;
+			}
+			int nsprite = 0;
+			for (int i = 0; i < 64; i++)
+			{
+				int spr_addr = 4 * i;
+				int daddr = nsprite * 4;
+				int s_ypos = spr[spr_addr++];
+				int s_ypixel = y_pos - s_ypos;
+				if (s_ypixel >= 0 && s_ypixel < sprite_height)
 				{
-					int color0 = (pattern0>>(7-x_pixel))&1;
-					int color1 = (pattern1>>(7-x_pixel))&1;
-					int color = color0 | (color1<<1);
-
-					int pal=0;
-
-					if(color==0)
+					if (nsprite < 8)
 					{
-						pal = ReadPPU(0x3F00);
+						sprites[daddr++] = s_ypos;
+						sprites[daddr++] = spr[spr_addr++];
+						sprites[daddr++] = spr[spr_addr++];
+						sprites[daddr++] = spr[spr_addr++];
+						nsprite++;
 					}
 					else
 					{
-						pal = ReadPPU(0x3F00 + 4*attr + color);
+						status |= 0x40;
+						break;
 					}
-
-					int r = min(255,((int)ppu_palette[pal][0]*(256 + 32*((ctrl2>>6)&1)))>>8);
-					int g = min(255,((int)ppu_palette[pal][1]*(256 + 32*((ctrl2>>5)&1)))>>8);
-					int b = min(255,((int)ppu_palette[pal][2]*(256 + 32*((ctrl2>>7)&1)))>>8);
-
-					ts[x_pixel] = b | (g<<8) | (r<<16);
 				}
 			}
-
-			int* line = scan+(x_scroll&7);
-			display->SetScanline(y_pos,line);
-#endif
+			/*if (nsprite > 0 && !dbg_sp)
+			{
+				dbg_sp = true;
+				printf("Sprites [%d]: ", y_pos);
+				for (int i = 0; i < min(nsprite,8); i++)
+				{
+					int daddr = i * 4;
+					int a = sprites[daddr++];
+					int b = sprites[daddr++];
+					int c = sprites[daddr++];
+					int d = sprites[daddr++];
+					printf("[%02x %02x %02x %02x], ", a, b, c, d);
+				}
+				printf("count=%d\n", nsprite);
+			}*/
 		}
 
+
 		scanline++;
+
+		if (scanline > 257 && scanline <= 320)
+		{
+			spr_addr = 0;
+		}
 
 		if(scanline==261)
 		{
 			status|=0x80;
-			if(ctrl1>>7)
+			if(ctrl>>7)
 				cpu->NMI();
 			core->DoVSync();
-
-			spr_addr = 0;
+			dbg_sp = false;
 		}
 
 		if(scanline==scanline_last)
 		{
 			scanline=0;
 			frame++;
-
-#define TIME_PER_FRAME_PAL (1000.0f/53.355f)
-#define TIME_PER_FRAME_NTSC (1000.0f/60.098f)
-
-            float time_per_frame =
-                vmode ? TIME_PER_FRAME_PAL : TIME_PER_FRAME_NTSC;
-
-            static int ticks_last = 0;
-            static float elapsed_acc = 0;
-            do {
-                int ticks_now = GetTickCount();
-                int elapsed = ticks_now - ticks_last;
-                ticks_last = ticks_now;
-                elapsed_acc += elapsed;
-                if (elapsed_acc < time_per_frame)
-                {
-                    SleepEx(max(1,(int)(time_per_frame - elapsed_acc)), TRUE);
-                }
-                else {
-                    elapsed_acc -= time_per_frame;
-                    if (elapsed_acc > 10 * time_per_frame)
-                        elapsed_acc = 0;
-                    break;
-                }
-            } while (1);
+//
+//#define TIME_PER_FRAME_PAL (1000.0f/53.355f)
+//#define TIME_PER_FRAME_NTSC (1000.0f/60.098f)
+//
+//            float time_per_frame =
+//                vmode ? TIME_PER_FRAME_PAL : TIME_PER_FRAME_NTSC;
+//
+//            static int ticks_last = 0;
+//            static float elapsed_acc = 0;
+//            do {
+//                int ticks_now = GetTickCount();
+//                int elapsed = ticks_now - ticks_last;
+//                ticks_last = ticks_now;
+//                elapsed_acc += elapsed;
+//                if (elapsed_acc < time_per_frame)
+//                {
+//                    SleepEx(max(1,(int)(time_per_frame - elapsed_acc)), TRUE);
+//                }
+//                else {
+//                    elapsed_acc -= time_per_frame;
+//                    if (elapsed_acc > 10 * time_per_frame)
+//                        elapsed_acc = 0;
+//                    break;
+//                }
+//            } while (1);
 		}
 	}
 
 }
-//
-//void Ppu::Emulate(u32 clocks)
-//{
-//	//Item              NTSC             PAL
-//	//Video Clock       21.47727MHz      26.601712MHz
-//	//CPU Clock         1.7897725MHz     1.7734474MHz
-//	//Clock Divider     CPU=Video/12     CPU=Video/15
-//	//Cycles/Scanline   113.66; 1364/12  106.53; 1598/15
-//	//Total Scanlines   262 (240+22)     312 (240+72)
-//	//Frame Rate        60.098Hz         53.355Hz
-//
-//	float scanline_clocks;
-//
-//	int scanline_last;
-//
-//	// accumulate clocks
-//	if(vmode) // PAL
-//	{
-//		tClocks += clocks * 15;
-//		scanline_clocks = 1598;
-//		scanline_last = 311;
-//	}
-//	else
-//	{
-//		tClocks += clocks * 12;
-//		scanline_clocks = 1364;
-//		scanline_last = 261;
-//	}
-//	
-//	if(tClocks >= scanline_clocks)
-//	{
-//		tClocks -= scanline_clocks;
-//
-//		if(scanline==19)
-//		{
-//			status&=0x7f;
-//		}
-//
-//		if((scanline>20)&&(scanline<261))
-//		{
-//			int sprites_offset = (ctrl1&0x08)<<9;
-//			int pattern_offset = (ctrl1&0x10)<<8;
-//
-//			int names_offset = 0x2000 + ((ctrl1&3)<<10);
-//			int attr_offset  = 0x03C0 + names_offset;
-//
-//			int spr_layer = (ctrl2&0x10)>>8;
-//			int bg_layer = (ctrl2&0x08)>>7;
-//			int spr_clip = (ctrl2&0x04)>>1;
-//			int bg_clip = (ctrl2&0x02)>>2;
-//			int bg_mono = (ctrl2&0x01);
-//
-//			int table_x = (ctrl1&1)*256;
-//			int table_y = (ctrl1&2)*120; // 240 = 2*120
-//
-//			int x_offset = scroll1;
-//			int y_offset = scroll2;
-//
-//			if(y_offset>=240)
-//			{
-//				y_offset = 240-y_offset;
-//			}
-//
-//			int y_pos = scanline-21;
-//			int y = ((table_y + y_pos + y_offset)%480);
-//
-//			int y_tile = y>>3;
-//			int tile_y = y&7;
-//
-
-//		}
-//
-//		scanline++;
-//
-//		if(scanline==261)
-//		{
-//			status|=0x80;
-//			if(ctrl1>>7)
-//				cpu->NMI();
-//			core->DoVSync();
-//
-//			spr_addr = 0;
-//		}
-//
-//		if(scanline==scanline_last)
-//		{
-//			scanline=0;
-//			frame++;
-//		}
-//	}
-//	
-//}
 
 void Ppu::WriteVRAM(u16 addr, u8 value)
 {
@@ -474,7 +432,7 @@ void Ppu::WritePPU(u16 addr, u8 value)
 	}
 }
 
-u8   Ppu::ReadPPU (u16 addr)
+int Ppu::ReadPPU (u16 addr)
 {
 	if(addr<0x3f00)
 	{
@@ -499,7 +457,7 @@ void Ppu::Write(u16 addr, u8 value)
 		//Bit2  Port 2007h VRAM Address Increment (0=Increment by 1, 1=Increment by 32)
 		//Bit1-0 Name Table Scroll Address        (0-3=VRAM 2000h,2400h,2800h,2C00h)
 		//(That is, Bit0=Horizontal Scroll by 256, Bit1=Vertical Scroll by 240)
-		ctrl1 = value;
+		ctrl = value;
 		break;
 
 	case 0x0001:
@@ -511,7 +469,7 @@ void Ppu::Write(u16 addr, u8 value)
 		//Bit0  Monochrome Mode       (0=Color, 1=Monochrome)  (see Palettes chapter)
 		//If both sprites and BG are disabled (Bit 3,4=0) then video output is disabled, and VRAM can be accessed at any time (instead of during VBlank only).
 		//However, SPR-RAM does no longer receive refresh cycles, and its content will gradually degrade when the display is disabled.
-		ctrl2 = value;
+		mask = value;
 		break;
 
 	case 0x0002:
@@ -564,7 +522,7 @@ void Ppu::Write(u16 addr, u8 value)
 			scroll2 = (scroll2&0x3F)|((value&3)<<6);
 			//A10 2006h/1st-Bit2 <--> X*256 2000h-Bit0
 			//A11 2006h/1st-Bit3 <--> Y*240 2000h-Bit1
-			ctrl1 = (ctrl1&0xFC)|((value>>2)&3);
+			ctrl = (ctrl&0xFC)|((value>>2)&3);
 			//A12 2006h/1st-Bit4 <--> Y*1   2005h/2nd-Bit0
 			//A13 2006h/1st-Bit5 <--> Y*2   2005h/2nd-Bit1
 			//-   2006h/1st-Bit6 <--> Y*4   2005h/2nd-Bit2
@@ -596,7 +554,7 @@ void Ppu::Write(u16 addr, u8 value)
 			temp |= (scroll2>>6)&0x3;
 			//A10 2006h/1st-Bit2 <--> X*256 2000h-Bit0
 			//A11 2006h/1st-Bit3 <--> Y*240 2000h-Bit1
-			temp |= (ctrl1&0x03)<<2;
+			temp |= (ctrl&0x03)<<2;
 			//A12 2006h/1st-Bit4 <--> Y*1   2005h/2nd-Bit0
 			//A13 2006h/1st-Bit5 <--> Y*2   2005h/2nd-Bit1
 			//-   2006h/1st-Bit6 <--> Y*4   2005h/2nd-Bit2
@@ -618,19 +576,23 @@ void Ppu::Write(u16 addr, u8 value)
 		//the desired address.
 		WritePPU(vram_addr,value);
 
-		vram_addr += (ctrl1&4)?32:1;
+		vram_addr += (ctrl&4)?32:1;
 
 		break;
 	}
 	else switch(addr)
 	{
 	case 0x4014:
-		cpu->Stall(512);
+		//printf("Sprite DMA %04x -> %04x: \n", ((u16)value) << 8, spr_addr);
+		u16 addr = ((u16)value) << 8;
 		for(int i=0;i<256;i++)
 		{
-			spr[(spr_addr+i)&255] = memory->Read((u16(value)<<8)+i);
+			u8 val = spr[spr_addr] = memory->Read(addr++);
+			spr_addr = (spr_addr + 1) & 0xFF;
+			//printf(" %02x,", val);
 		}
-
+		//printf("\n");
+		cpu->Stall(512);
 		break;
 	}
 /*
@@ -724,16 +686,17 @@ Note: Initializing the tile row to 30 or 31 will display garbage tiles (fetched 
 
 }
 
-u8   Ppu::Read (u16 addr)
+int Ppu::Read (u16 addr)
 {
-	u8 ret = 0;
+	int ret = -1;
 	if(addr<0x4000) switch(addr&0x0007) 
 	{
 	case 0x0000:
-		ret= ctrl1; break;
+		ret= ctrl; break;
 
 	case 0x0001:
-		ret= ctrl2; break;
+		//ret= mask;
+		break;
 
 	case 0x0002:
 		//  Bit7   VBlank Flag    (1=VBlank)
@@ -752,7 +715,7 @@ u8   Ppu::Read (u16 addr)
 		write_num=0;
 		ret = status; 
 		status&=0x7f;
-		return ret;
+
 		break;
 
 	case 0x0003:
@@ -787,14 +750,14 @@ u8   Ppu::Read (u16 addr)
 			ret = ReadPPU(vram_addr);
 		}
 
-		vram_addr += (ctrl1&4)?32:1;
+		vram_addr += (ctrl&4)?32:1;
 
 		break;
 	default:
 		printf("PPU: Unhandled Memory Read: [0x%04x]\n",addr);
-		return 0;
+		break;
 	}
-	printf(" * DEBUG: Read from PPU [%04x] value=0x%04x\n",addr,ret);
+	//printf(" * DEBUG: Read from PPU [%04x] value=0x%04x\n",addr,ret);
 
 	return ret;
 }

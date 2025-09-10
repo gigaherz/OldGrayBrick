@@ -77,9 +77,9 @@ public:
 	Mapper0(NesROMHeader hdr, FILE* rom_file);
 	virtual ~Mapper0(void);
 	virtual void Write(u16 addr, u8 value);
-	virtual u8   Read (u16 addr);
+	virtual int  Read (u16 addr);
 	virtual void WritePPU(u16 addr, u8 value);
-	virtual u8   ReadPPU(u16 addr);
+	virtual int  ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
     virtual void SoftReset();
@@ -127,9 +127,9 @@ public:
 	Mapper1(NesROMHeader hdr, FILE* rom_file);
 	virtual ~Mapper1(void);
 	virtual void Write(u16 addr, u8 value);
-	virtual u8   Read (u16 addr);
+	virtual int  Read(u16 addr);
 	virtual void WritePPU(u16 addr, u8 value);
-	virtual u8   ReadPPU(u16 addr);
+	virtual int  ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
     virtual void SoftReset();
@@ -164,9 +164,9 @@ public:
 	Mapper2(NesROMHeader hdr, FILE* rom_file);
 	virtual ~Mapper2(void);
 	virtual void Write(u16 addr, u8 value);
-	virtual u8   Read(u16 addr);
+	virtual int  Read(u16 addr);
 	virtual void WritePPU(u16 addr, u8 value);
-	virtual u8   ReadPPU(u16 addr);
+	virtual int  ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
 	virtual void SoftReset();
@@ -204,12 +204,56 @@ public:
 	Mapper3(NesROMHeader hdr, FILE* rom_file);
 	virtual ~Mapper3(void);
 	virtual void Write(u16 addr, u8 value);
-	virtual u8   Read(u16 addr);
+	virtual int  Read(u16 addr);
 	virtual void WritePPU(u16 addr, u8 value);
-	virtual u8   ReadPPU(u16 addr);
+	virtual int  ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
 	virtual void SoftReset();
+	virtual void Close();
+	virtual void Emulate(u32 clocks);
+	virtual int VMode();
+
+};
+
+class Mapper4 : public Mapper
+{
+private:
+	u8* PRAM;
+	u8* PROM;
+	u8* VROM;
+
+	u8* PROM_AREA0;
+	u8* PROM_AREA1;
+	u8* PROM_AREA2;
+	u8* PROM_AREA3;
+	u8* VROM_AREA0;
+
+	NesROMHeader header;
+
+	int prom_banks;
+	int prom_size;
+	int prom_mask;
+
+	int vrom_banks;
+	int vrom_size;
+	int vrom_mask;
+
+	u8 idx_ctrl;
+	u16 xor_prg;
+	u16 xor_ppu;
+
+	u8 mirror_select;
+public:
+
+	Mapper4(NesROMHeader hdr, FILE* rom_file);
+	virtual ~Mapper4(void);
+	virtual void Write(u16 addr, u8 value);
+	virtual int Read(u16 addr);
+	virtual void WritePPU(u16 addr, u8 value);
+	virtual int ReadPPU(u16 addr);
+	virtual void Init();
+	virtual void Reset();
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
@@ -242,9 +286,9 @@ public:
 	Mapper11(NesROMHeader hdr, FILE* rom_file);
 	virtual ~Mapper11(void);
 	virtual void Write(u16 addr, u8 value);
-	virtual u8   Read(u16 addr);
+	virtual int  Read(u16 addr);
 	virtual void WritePPU(u16 addr, u8 value);
-	virtual u8   ReadPPU(u16 addr);
+	virtual int  ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
 	virtual void SoftReset();

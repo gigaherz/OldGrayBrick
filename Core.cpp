@@ -101,6 +101,12 @@ void Core::Stop()
 	running=false;
 }
 
+void Core::TogglePause()
+{
+	if (running) Stop();
+	else Start();
+}
+
 void Core::Emulate()
 {
 	if(!running)

@@ -14,6 +14,7 @@ void SndClose();					// Return Value: none
 s32  SndWrite(s32 ValL, s32 ValR);	// Return Value: 0 = SENT, -1 = IGNORED(buffer full)
 s32  SndTest();
 bool SndGetStats(u32 *written, u32 *played);
+bool SndCanWrite();
 
 extern s32 SampleRate;
 
@@ -119,6 +120,7 @@ struct /*NESaudio*/
 	s32 Channel5_FreqCounter; 
 
 	s32 Channel5_DMAAddr;
+	s32 Channel5_DMARem;
 	s32 Channel5_Data;
 	s32 Channel5_Bit;
 
@@ -131,12 +133,12 @@ struct /*NESaudio*/
 
 	s32 Is_PAL;
 
-	s32 SampleRate;
-
 	s32 ResetCounter;
 
 	float ClockAccum;
 	float OutAccum;
+
+	float OutLowpass;
 
 } State;
 
@@ -166,7 +168,7 @@ void Apu::Init(int vmode, s32 output_sample_rate)
 {
 	Reset();
 	State.Is_PAL = vmode;
-	State.SampleRate=output_sample_rate;
+	SampleRate=output_sample_rate;
 	snd_ok=0;
 	if(!SndInit(output_sample_rate))
 		snd_ok=1;
@@ -222,9 +224,10 @@ void Apu::Write_Out(s32 sample)
 void Apu::Write(u16 addr, u8 value)
 {
 	int ch=(addr>>2)&3;
-	int index=0;
 
 	//if(State.ResetCounter>0) return;
+
+	//printf("APU Write [%04x] = %02x\n", addr, value);
 
 	switch(addr)
 	{
@@ -307,7 +310,7 @@ void Apu::Write(u16 addr, u8 value)
 
 		if(State.Channels[ch].Enabled)
 		{
-			index=(value>>3);
+			int index=(value>>3);
 			State.Channels[ch].LengthCounter=(LengthCounts[index])*29830;
 		}
 
@@ -322,6 +325,8 @@ void Apu::Write(u16 addr, u8 value)
 		State.Channel5_Loop      = (value>>6)&1;
 		State.Channel5_Frequency = DMCFreqs[value&15];
 
+		State.StatusReg &= ~0x80;
+
 		break;
 	case 0x4011: // DMC Delta counter load register
 
@@ -331,14 +336,15 @@ void Apu::Write(u16 addr, u8 value)
 		break;
 	case 0x4012: // DMC address load register
 
-		State.Channel5_DMAStart = ((0xC000 + value * 0x40) | 0x8000)&0xFFFF;
+		State.Channel5_DMAStart = (0xC000 + (value << 6))&0xFFFF;
 		State.Channel5_DMAAddr = State.Channel5_DMAStart;
 		State.Channel5_Bit=8;
 
 		break;
 	case 0x4013: // DMC length register
 
-		State.Channel5_DMALength = 0x10 * value + 1;
+		State.Channel5_DMALength = (value<<4) + 1;
+		State.Channel5_DMARem = State.Channel5_DMALength;
 
 		break;
 	case 0x4015: // DMC/IRQ/length counter status/channel enable register
@@ -355,6 +361,7 @@ void Apu::Write(u16 addr, u8 value)
 		if(((value>>4)&1)&&(!State.Channel5_Enabled))
 		{
 			State.Channel5_DMAAddr = State.Channel5_DMAStart;
+			State.Channel5_DMARem = State.Channel5_DMALength;
 			State.Channel5_Bit=8;
 		}
 		State.Channel5_Enabled    = (value>>4)&1;
@@ -365,42 +372,38 @@ void Apu::Write(u16 addr, u8 value)
 		break;
 
 	case 0x4017: // APU Low frequency timer control (W)
-		ch=State.FrameIRQEnable;
-		index=State.Is_PAL;
-		State.FrameIRQEnable=((value>>6)&1)^1;
-		State.Is_PAL=((value>>7)&1)^1;
-		
-		if(State.FrameIRQEnable&&(!ch))
+	{
+		ch = State.FrameIRQEnable;
+		int wasPal = State.Is_PAL;
+		State.FrameIRQEnable = ((value >> 6) & 1) ^ 1;
+		State.Is_PAL = ((value >> 7) & 1) ^ 1;
+
+		if (State.FrameIRQEnable && (!ch))
 		{
 			State.FrameCount = 29830;
 		}
 
 		//State.StatusReg|=0x40;
 
-		if((State.Is_PAL)&&(!index))
-		//if(value&0x80)
+		//if ((State.Is_PAL) && (!wasPal))
+		if (State.Is_PAL != wasPal)
+			//if(value&0x80)
 		{
-			State.StatusReg&=0xBF;
-			for(int i=0;i<4;i++)
+			State.StatusReg &= 0xBF;
+			for (int i = 0; i < 4; i++)
 			{
-				if(State.Channels[i].LengthCountEnable)
-					State.Channels[i].LengthCounter=0;
+				if (State.Channels[i].LengthCountEnable)
+					State.Channels[i].LengthCounter = 0;
 			}
-			State.Channel5_DMALength=0;
-		}
-		
-		if(!State.FrameIRQEnable)
-		{
-			State.StatusReg&=0xBF;
+			State.Channel5_DMALength = 0;
 		}
 
-		// TODO: TEST AND FIX, THIS MAY BE WRONG
-		if (value & 0x80)
+		if (!State.FrameIRQEnable)
 		{
-			Emulate(1);
+			State.StatusReg &= 0xBF;
 		}
 		break;
-
+	}
 	default:
 		printf("APU: Unhandled Memory Write: [0x%04x]=0x%02x\n",addr,value);
 		break;
@@ -408,31 +411,32 @@ void Apu::Write(u16 addr, u8 value)
 	}
 }
 
-u8 Apu::Read(u16 addr)
+int Apu::Read(u16 addr)
 {
-	u8 ret=0;
-
 	//if(State.ResetCounter>0) return 0;
 
 	switch(addr)
 	{
 	case 0x4015:
-		ret |= ((State.Channels[0].LengthCounter>0)&1);
-		ret |= ((State.Channels[1].LengthCounter>0)&1)<<1;
-		ret |= ((State.Channels[2].LengthCounter>0)&1)<<2;
-		ret |= ((State.Channels[3].LengthCounter>0)&1)<<3;
-		ret |= ((State.Channel5_DMALength>0)&1)<<4;
-		ret |= State.StatusReg;
+	{
+		int status = 0;
+		status |= ((State.Channels[0].LengthCounter > 0) & 1);
+		status |= ((State.Channels[1].LengthCounter > 0) & 1) << 1;
+		status |= ((State.Channels[2].LengthCounter > 0) & 1) << 2;
+		status |= ((State.Channels[3].LengthCounter > 0) & 1) << 3;
+		status |= ((State.Channel5_DMALength > 0) & 1) << 4;
+		status |= State.StatusReg;
 
 		// Frame IRQ ACK
-		State.StatusReg&=0xBF; //clear frame irq flag
+		State.StatusReg &= 0xBF; //clear frame irq flag
 		//State.FrameCount = 29830;
 
-		break;
+		return status;
+	}
 	default:
 		printf("APU: Unhandled Memory Read: [0x%04x]\n",addr);
+		return -1;
 	}
-	return ret;
 }
 
 s32 mix_max=0;
@@ -457,239 +461,273 @@ void Apu::Emulate(u32 clocks) //APU clock rate = 1789800Hz (DDR'd)
 
 	TotalPlayedClocks +=clocks;
 
-	if(clocks==0) return;
+	if (clocks <= 0)
+	{
+		return;
+	}
 
-	if(State.Is_PAL)
-		State.ClockAccum += clocks * 4.0f/5.0f;
+	if (State.Is_PAL)
+		State.ClockAccum += clocks * 5.0f / 4.0f;
 	else
 		State.ClockAccum += clocks;
 
 
-	float cps = 1789800.0f/(State.SampleRate);
-
-//	if(State.Is_PAL)
-//		cps*=5.0f/4.0f;
+	float cyclesPerSample = SampleRate > 0 ? 1789800.0f / SampleRate : 0;
 
 	while(State.ClockAccum>=1)
 	{
-		static s32 ch[5]={0,0,0,0,0}; // 0..15 each
+		s32 sqr[2] = { 0, 0 }; // 0..15
+		s32 tri = 0; // 0..15 each
+		s32 noise = 0; // 0..15 each
+		s32 dmc = 0; // 0..15 each
 
-		if(State.ResetCounter>0)
+		if (State.ResetCounter > 0)
 		{
-			State.ResetCounter-=2;
+			State.ResetCounter -= 2;
 		}
 		else
 		{
 			//frame IRQ
-			if((State.FrameCount>0)&&(State.FrameIRQEnable))
+			if ((State.FrameCount > 0) && (State.FrameIRQEnable))
 			{
 				State.FrameCount--; //~60hz on NTSC mode
-				if(State.FrameCount<=0)
+				if (State.FrameCount <= 0)
 				{
 					Apu::Frame_IRQ();
 					State.FrameCount = 29830;
 				}
 			}
 
-			for(int i=0;i<2;i++)
+			for (int i = 0; i < 2; i++)
 			{
-				if((State.Channels[i].Enabled)&&(State.Channels[i].LengthCounter>0))
+				if ((State.Channels[i].Enabled) && (State.Channels[i].LengthCounter > 0))
 				{
-					State.Channels[i].FreqCounter --;
+					State.Channels[i].FreqCounter--;
 
-					if(State.Channels[i].LengthCountEnable)
+					if (State.Channels[i].LengthCountEnable)
 					{
 						State.Channels[i].LengthCounter--;
 					}
 
-					if(State.Channels[i].Volume>0)
+					if (State.Channels[i].Volume > 0)
 					{
-						if((State.Channels[i].SweepEnable)&&(State.Channels[i].SweepShift>0)&&(State.Channels[i].SweepRate>0))
+						if ((State.Channels[i].SweepEnable) && (State.Channels[i].SweepShift > 0) && (State.Channels[i].SweepRate > 0))
 						{
-							State.Channels[i].SweepCounter --;
+							State.Channels[i].SweepCounter--;
 
-							if(State.Channels[i].SweepCounter<=0)
+							if (State.Channels[i].SweepCounter <= 0)
 							{
-								s32 f=(State.Channels[i].Frequency>>State.Channels[i].SweepShift);
-								if(!State.Channels[i].SweepDirection)
+								s32 f = (State.Channels[i].Frequency >> State.Channels[i].SweepShift);
+								if (!State.Channels[i].SweepDirection)
 								{
-									f=(~f)+i;
+									f = (~f) + i;
 								}
-								State.Channels[i].Frequency +=f;
-								State.Channels[i].SweepCounter+=State.Channels[i].SweepRate*14915;
+								State.Channels[i].Frequency += f;
+								State.Channels[i].SweepCounter += State.Channels[i].SweepRate * 14915;
 
-								if(State.Channels[i].Frequency<0)
+								if (State.Channels[i].Frequency < 0)
 								{
-									State.Channels[i].Frequency=0;
+									State.Channels[i].Frequency = 0;
 								}
 							}
 						}
 
-						if((State.Channels[i].DecayEnable)&&(State.Channels[i].DecayRate>0))
+						if ((State.Channels[i].DecayEnable) && (State.Channels[i].DecayRate > 0))
 						{
-							State.Channels[i].DecayCounter-=2;
+							State.Channels[i].DecayCounter -= 2;
 
-							if(State.Channels[i].DecayCounter<=0)
+							if (State.Channels[i].DecayCounter <= 0)
 							{
 								State.Channels[i].Volume--;
-								State.Channels[i].DecayCounter+=State.Channels[i].DecayRate*4*14915;
+								State.Channels[i].DecayCounter += State.Channels[i].DecayRate * 4 * 14915;
 
-								if((State.Channels[i].Volume<=0)&&(State.Channels[i].DecayLoop))
+								if ((State.Channels[i].Volume <= 0) && (State.Channels[i].DecayLoop))
 								{
-									State.Channels[i].Volume=0xF;
+									State.Channels[i].Volume = 0xF;
 								}
 							}
 						}
 
-						if((State.Channels[i].FreqCounter<=0)&&(((State.Channels[i].Frequency+1))>0))
+						if ((State.Channels[i].FreqCounter <= 0) && (((State.Channels[i].Frequency + 1)) > 0))
 						{
-							State.Channels[i].FreqCounter += (State.Channels[i].Frequency+1);
-							State.Channels[i].Position=(State.Channels[i].Position+1)%8;
+							State.Channels[i].FreqCounter += (State.Channels[i].Frequency + 1);
+							State.Channels[i].Position = (State.Channels[i].Position + 1) % 8;
 						}
 
-						ch[i]=0;
-						if((State.Channels[i].Frequency<=0x7FF)&&(State.Channels[i].Frequency>=0x8))
+						sqr[i] = 0;
+						if ((State.Channels[i].Frequency <= 0x7FF) && (State.Channels[i].Frequency >= 0x8))
 						{
-							ch[i]= Rcycle[State.Channels[i].Duty][State.Channels[i].Position]?State.Channels[i].Volume:0;
+							sqr[i] = Rcycle[State.Channels[i].Duty][State.Channels[i].Position] ? State.Channels[i].Volume : 0;
 						}
 					}
 				}
 			}
 
 			// get value for channel 3 (0..15)
-			if((State.Channels[2].Enabled)&&(State.Channels[2].LengthCounter>0)&&(State.Channels[2].LinearCounter>0))
+			if ((State.Channels[2].Enabled) && (State.Channels[2].LengthCounter > 0) && (State.Channels[2].LinearCounter > 0))
 			{
-				State.Channels[2].FreqCounter --;
+				State.Channels[2].FreqCounter--;
 
-				if(State.Channels[2].LengthCountEnable)
+				if (State.Channels[2].LengthCountEnable)
 				{
-					State.Channels[2].LengthCounter --;
+					State.Channels[2].LengthCounter--;
 				}
 				else
 				{
 					State.Channels[2].LinearCounter -= 2;
 				}
 
-				if((State.Channels[2].FreqCounter<=0)&&(((State.Channels[2].Frequency+1)/4)>0))
+				if ((State.Channels[2].FreqCounter <= 0) && (((State.Channels[2].Frequency + 1) / 4) > 0))
 				{
-					State.Channels[2].FreqCounter += (State.Channels[2].Frequency+1);
-					State.Channels[2].Position=(State.Channels[2].Position+1)%32;
+					State.Channels[2].FreqCounter += (State.Channels[2].Frequency + 1);
+					State.Channels[2].Position = (State.Channels[2].Position + 1) % 32;
 				}
 
-				ch[2]= TriangleCycle[State.Channels[2].Position];
+				tri = TriangleCycle[State.Channels[2].Position];
 			}
 
 			// get value for channel 4 (0..15)
-			if((State.Channels[3].Enabled)&&(State.Channels[3].LengthCounter>0))
+			if ((State.Channels[3].Enabled) && (State.Channels[3].LengthCounter > 0))
 			{
-				State.Channels[3].FreqCounter --;
+				State.Channels[3].FreqCounter--;
 
-				if(State.Channels[3].LengthCountEnable)
+				if (State.Channels[3].LengthCountEnable)
 				{
-					State.Channels[3].LengthCounter --;
+					State.Channels[3].LengthCounter--;
 				}
 
-				if((State.Channels[3].DecayEnable)&&(State.Channels[3].DecayRate>0))
+				if ((State.Channels[3].DecayEnable) && (State.Channels[3].DecayRate > 0))
 				{
-					State.Channels[3].DecayCounter -=2;
+					State.Channels[3].DecayCounter -= 2;
 
-					if(State.Channels[3].DecayCounter<=0)
+					if (State.Channels[3].DecayCounter <= 0)
 					{
 						State.Channels[3].Volume--;
-						State.Channels[3].DecayCounter+=State.Channels[3].DecayRate*14915;
+						State.Channels[3].DecayCounter += State.Channels[3].DecayRate * 14915;
 
-						if((State.Channels[3].Volume<=0)&&(State.Channels[3].DecayLoop))
+						if ((State.Channels[3].Volume <= 0) && (State.Channels[3].DecayLoop))
 						{
-							State.Channels[3].Volume=0xF;
+							State.Channels[3].Volume = 0xF;
 						}
 					}
 				}
 
-				if((State.Channels[3].FreqCounter<=0)&&(((State.Channels[3].Frequency+1)/8)>0))
+				if ((State.Channels[3].FreqCounter <= 0) && (((State.Channels[3].Frequency + 1) / 8) > 0))
 				{
-					State.Channels[3].FreqCounter += (State.Channels[3].Frequency+1)/2;
+					State.Channels[3].FreqCounter += (State.Channels[3].Frequency + 1) / 2;
 
-					s32 t = State.Channels[3].NoiseReg>>14;
+					s32 t = State.Channels[3].NoiseReg >> 14;
 
-					if(State.Channels[3].ShortNoise)
-						t=t ^ ((State.Channels[3].NoiseReg>>8)&1);
+					if (State.Channels[3].ShortNoise)
+						t = t ^ ((State.Channels[3].NoiseReg >> 8) & 1);
 					else
-						t=t ^ ((State.Channels[3].NoiseReg>>13)&1);
+						t = t ^ ((State.Channels[3].NoiseReg >> 13) & 1);
 
-					State.Channels[3].NoiseReg=((State.Channels[3].NoiseReg<<1)&0x7fff)|t;
+					State.Channels[3].NoiseReg = ((State.Channels[3].NoiseReg << 1) & 0x7fff) | t;
 				}
 
-				ch[3]= (State.Channels[3].NoiseReg&1)?State.Channels[3].Volume:0;
+				noise = (State.Channels[3].NoiseReg & 1) ? State.Channels[3].Volume : 0;
 			}
 
 			// get value for channel 5 (0..15)
-			if((State.Channel5_Enabled)&&(State.Channel5_DMALength>0))
+
+			if (State.Channel5_DMARem > 0)
+				State.StatusReg = (State.StatusReg & ~0x10);
+			else
+				State.StatusReg = (State.StatusReg | 0x10);
+			if ((State.Channel5_Enabled) && (State.Channel5_DMALength > 0))
 			{
-				State.Channel5_FreqCounter --;
+				State.Channel5_FreqCounter--;
 
-				if((State.Channel5_FreqCounter<=0)&&(State.Channel5_Frequency>0))
+				if ((State.Channel5_FreqCounter <= 0) && (State.Channel5_Frequency > 0))
 				{
-					State.Channel5_FreqCounter += (State.Channel5_Frequency+1)/8;
+					State.Channel5_FreqCounter += (State.Channel5_Frequency + 1) / 8;
 
-					if(State.Channel5_Bit>=8)
+					if (State.Channel5_Bit >= 8)
 					{
-						State.Channel5_Data = Apu::DMA_Read(State.Channel5_DMAAddr);
-						State.Channel5_Bit=0;
-						State.Channel5_DMAAddr = ((State.Channel5_DMAAddr+1)&0x7fff)|0x8000;
+						if (State.Channel5_DMARem == 0)
+						{
+							if (State.Channel5_Loop)
+							{
+								State.Channel5_DMAAddr = State.Channel5_DMAStart;
+								State.Channel5_DMARem = State.Channel5_DMALength;
+							}
+							else
+							{
+								if (State.Channel5_IrqEnable)
+								{
+									State.StatusReg |= 0x80;
+								}
+								State.Channel5_Enabled = false;
+							}
+						}
+						if (State.Channel5_DMARem > 0)
+						{
+							State.Channel5_Data = Apu::DMA_Read(State.Channel5_DMAAddr);
+							State.Channel5_Bit = 0;
+							State.Channel5_DMAAddr = ((State.Channel5_DMAAddr + 1) & 0x7fff) | 0x8000;
+							State.Channel5_DMARem--;
+						}
 					}
 
-					if(State.Channel5_Data&1)
+					if (State.Channel5_Data & 1)
 					{
-						State.Channel5_Delta+=2;
-						if(State.Channel5_Delta>0x7e)
-							State.Channel5_Delta=0x7e;
+						State.Channel5_Delta += 2;
+						if (State.Channel5_Delta > 0x7e)
+							State.Channel5_Delta = 0x7e;
 					}
 					else
 					{
-						State.Channel5_Delta-=2;
-						if(State.Channel5_Delta<0)
-							State.Channel5_Delta=0;
+						State.Channel5_Delta -= 2;
+						if (State.Channel5_Delta < 0)
+							State.Channel5_Delta = 0;
 					}
 
-					State.Channel5_Data>>=1;
+					State.Channel5_Data >>= 1;
 					State.Channel5_Bit++;
 				}
-
-				ch[4]=State.Channel5_Delta;
 			}
+
+			dmc = State.Channel5_Delta;
+		}
+
+		if (State.Channel5_IrqEnable && (State.StatusReg & 0x80))
+		{
+			DMC_IRQ();
 		}
 
 		State.OutAccum++;
 
-		if(State.OutAccum>=cps)
+		if (cyclesPerSample > 0 && State.OutAccum >= cyclesPerSample)
 		{
 			//if(!sound_mute)
 			{
-
 				// mix them
-				s32 mix12 = (ch[0]+ch[1]);
+				s32 mix12 = (sqr[0] + sqr[1]);
 				s32 mix12_vol = 4096 - 55 * mix12;
 				s32 mix12_out = mix12 * mix12_vol / 20;     // (0..6144)
 
-				s32 mix35 = (ch[2]*8+ch[3]*8+ch[4]);
+				s32 mix35 = (tri * 8 + noise * 8 + dmc);
 				s32 mix35_vol = 4096 - 7 * mix35;
 				s32 mix35_out = mix35 * mix35_vol / 96;		// (0..15360)
 
 				s32 mix15 = mix12_out + mix35_out;			// (0..21504)
-				s32 mix15_out = (mix15 * 10)-32256;		// (-32256..32255)
+				s32 mix15_out = (mix15 * 10) - 32256;		// (-32256..32255)
 
-				if(mix15_out>mix_max) mix_max=mix15_out;
-				if(mix15_out<mix_min) mix_min=mix15_out;
+				if (mix15_out > mix_max) mix_max = mix15_out;
+				if (mix15_out < mix_min) mix_min = mix15_out;
 
-				Write_Out(mix15_out);
+				State.OutLowpass = State.OutLowpass * 0.98f + mix15_out * (1.0f - 0.98f);
+
+				Write_Out(mix15_out - (s32)State.OutLowpass);
 			}
 			/*else
 			{
 				Write_Out(0);
 			}*/
-			State.OutAccum-=cps;
+			State.OutAccum -= cyclesPerSample;
 		}
 
-		State.ClockAccum-=1;
+		State.ClockAccum -= 1;
 	}
 }

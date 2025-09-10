@@ -52,15 +52,15 @@ void Mapper11::Write(u16 addr, u8 value)
 {
 	if(addr>=0x8000)
 	{
-		p_which_bank = value & 3;
-		v_which_bank = (value>>4) & 7;
+		p_which_bank = min(value & 3, prom_banks-1);
+		v_which_bank = min((value>>4) & 7, vrom_banks-1);
 		PROM_AREA0 = PROM + p_which_bank * 32768;
 		VROM_AREA0 = VROM + v_which_bank * 8192;
 	}
 }
 
 static bool Mapper11errorprint = false;
-u8   Mapper11::Read (u16 addr)
+int  Mapper11::Read (u16 addr)
 {
 	if(addr<0x8000)
 	{
@@ -69,11 +69,11 @@ u8   Mapper11::Read (u16 addr)
 			Mapper11errorprint = true;
 			printf("Unhandled read from Mapper11 addr 0x%04x", addr);
 		}
-		return 0xA5;
+		return -1; // 0xA5;
 	}
 	else
 	{
-		return PROM_AREA0[(addr - 0x8000)&prom_mask];
+		return PROM_AREA0[(addr - 0x8000)& 32767];
 	}
 }
 
@@ -103,7 +103,7 @@ void Mapper11::WritePPU(u16 addr, u8 value)
 	}
 }
 
-u8   Mapper11::ReadPPU(u16 addr)
+int Mapper11::ReadPPU(u16 addr)
 {
 	if (addr < 0x2000)
 	{

@@ -62,7 +62,7 @@ void Mapper3::Write(u16 addr, u8 value)
 }
 
 static bool Mapper3errorprint = false;
-u8   Mapper3::Read (u16 addr)
+int Mapper3::Read (u16 addr)
 {
 	if (addr >= 0x6000 && addr < 0x8000)
 	{
@@ -75,7 +75,7 @@ u8   Mapper3::Read (u16 addr)
 			Mapper3errorprint = true;
 			printf("Unhandled read from Mapper3 addr 0x%04x", addr);
 		}
-		return 0xA5;
+		return -1; // 0xA5;
 	}
 	else
 	{
@@ -109,7 +109,7 @@ void Mapper3::WritePPU(u16 addr, u8 value)
 	}
 }
 
-u8   Mapper3::ReadPPU(u16 addr)
+int Mapper3::ReadPPU(u16 addr)
 {
 	if (addr < 0x2000)
 	{

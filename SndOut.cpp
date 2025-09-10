@@ -26,7 +26,7 @@ const s32 CurBufferSize = 2048;
 const s32 MaxBufferCount = 5;
 const s32 CurBufferCount = MaxBufferCount;
 
-const s32 LimitMode = 0;
+const s32 LimitMode = 1;
 
 s32 SampleRate;
 

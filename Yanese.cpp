@@ -215,6 +215,10 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 
 	case WM_KEYDOWN:
 		core->SetKey(wParam,1);
+		if (wParam == VK_PAUSE)
+		{
+			core->TogglePause();
+		}
 		return 0;
 
 	case WM_KEYUP:
@@ -264,8 +268,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &ncm, 0);
 
 	// Create the application's window
-	hWnd = CreateWindow(_T("DrawingWnd"),_T("YaNESe"),
-		WS_OVERLAPPEDWINDOW, 0, 0, WIDTH*3+ncm.iBorderWidth*2, HEIGHT*3+ncm.iBorderWidth*2+ncm.iCaptionHeight+ncm.iMenuHeight,
+	hWnd = CreateWindow(_T("DrawingWnd"),_T("OldGrayBrick"),
+		WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, WIDTH*3+ncm.iBorderWidth*2, HEIGHT*3+ncm.iBorderWidth*2+ncm.iCaptionHeight+ncm.iMenuHeight,
 		GetDesktopWindow(), NULL, wc.hInstance, NULL );
 
 	// Show the window

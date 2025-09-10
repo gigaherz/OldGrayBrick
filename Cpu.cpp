@@ -20,7 +20,6 @@ int ShowDebug = 1;
 #define FLAG_Z   FLAG(1)
 #define FLAG_I   FLAG(2)
 #define FLAG_D   FLAG(3)
-#define FLAG_B   FLAG(4)
 #define FLAG_V   FLAG(6)
 #define FLAG_N   FLAG(7)
 
@@ -34,6 +33,8 @@ FILE* cpuLog = nullptr;
 
 void __forceinline Cpu::SetFlag(int f, u8 v)
 {
+    if (f == 5)
+        return;
     P &= ~(1 << f);
     P |= ((v & 1) << f);
 }
@@ -51,7 +52,8 @@ Cpu::~Cpu(void)
 void Cpu::Init()
 {
     Reset();
-    cpuLog = stdout; // fopen("i:\\yanese_cpu.log", "w");
+    //cpuLog = fopen("f:\\yanese_cpu.log", "w");
+    cpuLog = stdout;
 }
 
 void Cpu::Close()
@@ -124,7 +126,7 @@ void Cpu::NMI()
 {
     Push(PC >> 8);
     Push((u8)PC);
-    Push(P & 0xDF);
+    Push(P & 0xEF);
     PC = MemoryRead8(0xFFFA) | (MemoryRead8(0xFFFB) << 8);;
     SET_FLAG_I(1);
 }
@@ -140,14 +142,22 @@ int Cpu::Step()
         return stall;
     }
 
-    if (IRQ && (!FLAG_I))
+    if (IRQ && (!FLAG_I || interruptSetDelay > 0))
     {
-        IRQ--;
-        Push(PC >> 8);
-        Push((u8)PC);
-        Push(P & 0xDF);
-        PC = MemoryRead8(0xFFFE) | (MemoryRead8(0xFFFF) << 8);
-        SET_FLAG_I(1);
+        if (interruptSetDelay > 0) interruptSetDelay--;
+        if (interruptDelay <= 0)
+        {
+            IRQ--;
+            Push(PC >> 8);
+            Push((u8)PC);
+            Push(P & 0xEF);
+            PC = MemoryRead8(0xFFFE) | (MemoryRead8(0xFFFF) << 8);
+            SET_FLAG_I(1);
+        }
+        else
+        {
+            interruptDelay = 0;
+        }
     }
 
     //printf("PREV.: PC=%04x; A=%02x; X=%02x; Y=%02x; P=%02x\n",PC,A,X,Y,P);
@@ -199,6 +209,7 @@ int Cpu::Step()
 
 #define STORE_A() MemoryWrite8(a1, A)
 #define STORE_T() MemoryWrite8(a1, (u8)new_T)
+#define STORE_T2() MemoryWrite8(a2, (u8)new_T)
 
     switch (opcode)
     {
@@ -417,7 +428,7 @@ int Cpu::Step()
         cycles = 3; //  
         break;
     case 0x08: // PHP         Push processor status on stack   [S]=P
-        Push(P | 0x30);
+        Push(P | 0x30); // always 1 (bit 5) + break code (bit 4)
         cycles = 3; //  
         break;
     case 0x68: // PLA         Pull accumulator from stack      A=[S]
@@ -426,7 +437,7 @@ int Cpu::Step()
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
     case 0x28: // PLP         Pull processor status from stack P=[S]
-        P = (Pop() & 0xCF) | 0x20;
+        P = (Pop() & 0xCF);
         cycles = 4; //  
         break;
 
@@ -444,8 +455,6 @@ int Cpu::Step()
 
     case 0x69: // ADC #nn     Add Immediate           A=A+C+nn
         FETCH_IMMEDIATE(); // #nn
-        if (p1 == 0x80 && A == 0x7f && P==0x25)
-            A = A;
         ADC();
         cycles = 2; //  
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A); CALC_FLAG_V(new_T);
@@ -1259,6 +1268,7 @@ int Cpu::Step()
         break;
     case 0x58: // CLI         Clear interrupt disable bit I=0
         cycles = 2; //  
+        interruptDelay = 1;
         SET_FLAG_I(0);
         break;
     case 0xD8: // CLD         Clear decimal mode          D=0
@@ -1275,6 +1285,7 @@ int Cpu::Step()
         break;
     case 0x78: // SEI         Set interrupt disable bit   I=1
         cycles = 2; //  
+        //interruptSetDelay = 1;
         SET_FLAG_I(1);
         break;
     case 0xF8: // SED         Set decimal mode            D=1
@@ -1298,6 +1309,64 @@ int Cpu::Step()
         ////////////////////////////////////////////////////////////
         ////////////////////////////////////////////////////////////
         // CPU Illegal Opcodes
+
+        // SLO - ASL + ORA -- FIXME: cycle counts
+    case 0x03: // SLO (nn,X)
+        FETCH_INDIRECT_X();
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T2();
+        cycles = 8; //  
+        CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A); CALC_FLAG_C(new_A);
+        break;
+    case 0x07: // SLO nn
+        FETCH_ZERO_PAGE(); // nn
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T();
+        cycles = 5; //  
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        break;
+    case 0x0F: // SLO aaaa
+        FETCH_ABSOLUTE();
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T();
+        cycles = 6; //  
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        break;
+    case 0x13: // SLO (nn), Y
+        FETCH_INDIRECT_Y();
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T2();
+        cycles = 8; // 
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        break;
+    case 0x17: // SLO nn,X
+        FETCH_ZERO_PAGE_X(); // nn,X
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T();
+        cycles = 6; //  
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        break;
+    case 0x1B: // SLO aaaa,Y
+        FETCH_ABSOLUTE_Y();
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T();
+        cycles = 7; //  
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        break;
+    case 0x1F: // SLO aaaa,X
+        FETCH_ABSOLUTE_X(); // nnnn,X
+        new_T = (p1 << 1);
+        new_A = A | new_T;
+        STORE_T();
+        cycles = 7; //  
+        CALC_FLAG_N(new_T); CALC_FLAG_Z(new_T); CALC_FLAG_C(new_T);
+        break;
 
         // SAX and LAX
 
@@ -1362,9 +1431,6 @@ int Cpu::Step()
         cycles = 5; // *
         CALC_FLAG_N(new_A); CALC_FLAG_Z(new_A);
         break;
-
-
-        //if(opcode bleh
 
     // For SAX, both A and X are output to databus, LOW-bits are stronger than HIGH-bits, resulting in a "forceful" AND operation.
     // For LAX, the same value is written to both A and X.

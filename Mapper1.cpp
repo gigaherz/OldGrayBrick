@@ -119,7 +119,7 @@ void Mapper1::Write(u16 addr, u8 value)
 }
 
 static bool mapper1errorprint = false;
-u8   Mapper1::Read (u16 addr)
+int Mapper1::Read (u16 addr)
 {
 	if(addr<0x8000)
 	{
@@ -128,7 +128,7 @@ u8   Mapper1::Read (u16 addr)
 			mapper1errorprint = true;
 			printf("Unhandled read from mapper1 addr 0x%04x", addr);
 		}
-		return 0xA5;
+		return -1; // 0xA5;
 	}
 	else 
 	{
@@ -206,7 +206,7 @@ void Mapper1::WritePPU(u16 addr, u8 value)
 	}
 }
 
-u8   Mapper1::ReadPPU(u16 addr)
+int Mapper1::ReadPPU(u16 addr)
 {
 	if((addr<0x2000) /*&&(vrom_banks>0)*/)
 	{

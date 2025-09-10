@@ -20,7 +20,7 @@ class Core
 	bool running;
 	bool hadVSync;
 
-	u8 keyStates[256];
+	u8 keyStates[1024];
 
 public:
 	Core(void);
@@ -32,6 +32,7 @@ public:
     void SoftReset();
 	void Start();
 	void Stop();
+	void TogglePause();
 
 	void Emulate();
 
@@ -46,6 +47,9 @@ class Memory
 {
 private:
 	u8 WorkRam[0x800];
+
+	u8 OpenBusValue;
+	u8 OpenBusLifetime;
 
 public:
 	Memory(void);
@@ -65,10 +69,10 @@ class Mapper
 public:
 	virtual ~Mapper(void)=0;
 	virtual void Write(u16 addr, u8 value)=0;
-	virtual u8   Read (u16 addr)=0;
+	virtual int  Read (u16 addr)=0;
 
 	virtual void WritePPU(u16 addr, u8 value)=0;
-	virtual u8   ReadPPU (u16 addr)=0;
+	virtual int  ReadPPU (u16 addr)=0;
 
 	virtual void Init()=0;
 	virtual void Reset()=0;
@@ -108,6 +112,8 @@ private:
 	u8   Fetch();
 
 	int IRQ;
+	int interruptDelay;
+	int interruptSetDelay;
 
 	int stall;
 
@@ -145,8 +151,8 @@ class Ppu
 
 	u8  spr[256];
 	u32 spr_addr;
-	u32 ctrl1;
-	u32 ctrl2;
+	u32 ctrl;
+	u32 mask;
 	u32 status;
 
 	u32 scroll1;
@@ -165,6 +171,10 @@ class Ppu
 	u8 latch_2005;
 	u8 latch_2006;
 
+	u8 sprites[8*4];
+
+	u8 debug[0x3000];
+
 public:
 	Ppu(void);
 	~Ppu(void);
@@ -177,16 +187,18 @@ public:
 	void Emulate(u32 clocks);
 
 	void Write(u16 addr, u8 value);
-	u8   Read (u16 addr);
+	int  Read (u16 addr);
 
 	void WritePPU(u16 addr, u8 value);
-	u8   ReadPPU (u16 addr);
+	int  ReadPPU (u16 addr);
 	void WriteVRAM(u16 addr, u8 value);
 	u8   ReadVRAM (u16 addr);
 };
 
 class Apu
 {
+	s32 SampleRate;
+
 public:
 	Apu(void);
 	~Apu(void);
@@ -199,7 +211,7 @@ public:
 	void Emulate(u32 clocks); //APU clock rate = 1789800Hz (DDR'd)
 
 	void Write(u16 addr, u8 value);
-	u8   Read (u16 addr);
+	int  Read (u16 addr);
 
 private:
 	void Frame_IRQ();
