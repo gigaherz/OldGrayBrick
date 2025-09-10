@@ -45,6 +45,8 @@ Mapper  *LoadROM(char *fileName)
 		return new Mapper2(rom, from);
 	case 3:
 		return new Mapper3(rom, from);
+	case 4:
+		return new Mapper4(rom, from);
 	case 11:
 		return new Mapper11(rom, from);
 	}

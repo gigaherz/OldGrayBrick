@@ -82,6 +82,8 @@ public:
 	virtual void Emulate(u32 clocks)=0;
 
 	virtual int VMode()=0;
+
+	virtual void PPUHBlank()=0;
 };
 
 class Cpu

@@ -4,14 +4,51 @@
 
 Mapper4::Mapper4(NesROMHeader hdr, FILE* rom_file)
 {
+	pram_banks = hdr.romBanks;
 	prom_banks = hdr.romBanks;
 	vrom_banks = hdr.vromBanks;
 
+	pram_size = 8192 * pram_banks;
 	prom_size = 16384 * prom_banks;
 	vrom_size = 8192 * vrom_banks;
 
+	PRAM = new u8[pram_size];
+	PROM = new u8[prom_size];
+
+	if (vrom_size == 0)
+		VROM = new u8[8192];
+	else
+		VROM = new u8[vrom_size];
+
+	pram_mask = pram_size - 1;
 	prom_mask = prom_size - 1;
 	vrom_mask = vrom_size - 1;
+
+	PROM_AREA0 = PROM;
+	PROM_AREA1 = PROM;
+	PROM_AREA2 = PROM + ((prom_size - 16384) & prom_size);
+	PROM_AREA3 = PROM + ((prom_size - 8192) & prom_size);
+
+	VROM_AREA0 = VROM;
+	VROM_AREA1 = VROM;
+	VROM_AREA2 = VROM;
+	VROM_AREA3 = VROM;
+	VROM_AREA4 = VROM;
+	VROM_AREA5 = VROM;
+
+	BankSel = 0;
+	PRAMEnable = 0; // MMC6 only
+	PROMConfig = 0;
+	VROMConfig = 0;
+	PRAMWriteMask = 0;
+	PRAMReadMask = 0;
+	PRAMWriteMask2 = 0; // MMC6 only
+	PRAMReadMask2 = 0;
+	IRQLatch = 0;
+	IRQValue = 0;
+	IRQPending = 0;
+	IRQEnable = 0;
+	NametableCtrl = 0;
 
 	int read = 0;
 	if ((read = fread(PROM, 1, prom_size, rom_file)) != prom_size)
@@ -37,7 +74,7 @@ void Mapper4::Write(u16 addr, u8 value)
 {
 	if (addr < 0x8000)
 	{
-		if (addr >= 0x6000 && PRAM != nullptr)
+		if (addr >= 0x6000 && PRAM != nullptr && !PRAMWriteMask)
 		{
 			PRAM[addr & 0x1fff] = value;
 		}
@@ -62,20 +99,65 @@ void Mapper4::Write(u16 addr, u8 value)
 		switch (idx)
 		{
 		case 0: // bank select ctrl
+		{
+			BankSel = value & 0x03;
+			PRAMEnable = (value >> 5) & 1;
+			PROMConfig = (value >> 6) & 1;
+			VROMConfig = (value >> 7) & 1;
 			break;
+		}
 		case 1: // bank select data
+		{
+			switch (BankSel)
+			{
+			case 0: // 2kb area 1
+				VROM_AREA0 = VROM + (((value & 0xFE) * 1024) & vrom_size);
+				break;
+			case 1: // 2kb area 2
+				VROM_AREA1 = VROM + (((value & 0xFE) * 1024) & vrom_size);
+				break;
+			case 2: // 1kb area 1
+				VROM_AREA2 = VROM + ((value * 1024) & vrom_size);
+				break;
+			case 3: // 1kb area 2
+				VROM_AREA3 = VROM + ((value * 1024) & vrom_size);
+				break;
+			case 4: // 1kb area 3
+				VROM_AREA4 = VROM + ((value * 1024) & vrom_size);
+				break;
+			case 5: // 1kb area 4
+				VROM_AREA5 = VROM + ((value * 1024) & vrom_size);
+				break;
+			case 6:
+				PROM_AREA0 = PROM + ((value * 8192) & prom_size);
+				break;
+			case 7:
+				PROM_AREA1 = PROM + ((value * 8192) & prom_size);
+				break;
+			}
 			break;
+		}
 		case 2: // nametable ctrl
+			NametableCtrl = value & 1;
 			break;
 		case 3: // prg ram protect
+			PRAMWriteMask = value >> 7;
+			PRAMReadMask = (value >> 6) & 1;
+			PRAMWriteMask2 = (value >> 5) & 1; // MMC6 only
+			PRAMReadMask2 = (value >> 4) & 1; // MMC6 only
 			break;
 		case 4: // irq latch
+			IRQLatch = value;
 			break;
 		case 5: // irq reload
+			IRQValue = 0;
 			break;
 		case 6: // irq disable
+			IRQEnable = false;
+			IRQPending = false;
 			break;
 		case 7: // irq enable
+			IRQEnable = true;
 			break;
 		}
 	}
@@ -86,7 +168,7 @@ int Mapper4::Read(u16 addr)
 {
 	if (addr < 0x8000)
 	{
-		if (addr >= 0x6000 && PRAM != nullptr)
+		if (addr >= 0x6000 && PRAM != nullptr && !PRAMReadMask)
 		{
 			return PRAM[addr & 0x1fff];
 		}
@@ -101,7 +183,7 @@ int Mapper4::Read(u16 addr)
 	{
 		if (addr < 0xA000)
 		{
-			return PROM_AREA0[addr & 0x1fff];
+			return (PROMConfig ? PROM_AREA2 : PROM_AREA0)[addr & 0x1fff];
 		}
 		else if (addr < 0xC000)
 		{
@@ -109,7 +191,7 @@ int Mapper4::Read(u16 addr)
 		}
 		else if (addr < 0xE000)
 		{
-			return PROM_AREA2[addr & 0x1fff];
+			return (PROMConfig ? PROM_AREA0 : PROM_AREA2)[addr & 0x1fff];
 		}
 		else
 		{
@@ -129,7 +211,7 @@ void Mapper4::WritePPU(u16 addr, u8 value)
 		}
 		else
 		{
-			VROM_AREA0[addr] = value;
+			VROM[addr] = value;
 		}
 	}
 	else
@@ -148,7 +230,32 @@ int Mapper4::ReadPPU(u16 addr)
 {
 	if (addr < 0x2000)
 	{
-		return VROM_AREA0[addr & vrom_mask];
+		if (VROMConfig)
+			addr ^= 0x1000;
+		if (addr < 0x0800)
+		{
+			return VROM_AREA0[addr & 0x07ff];
+		}
+		else if (addr < 0x1000)
+		{
+			return VROM_AREA1[addr & 0x07ff];
+		}
+		else if (addr < 0x1400)
+		{
+			return VROM_AREA2[addr & 0x03ff];
+		}
+		else if (addr < 0x1800)
+		{
+			return VROM_AREA3[addr & 0x03ff];
+		}
+		else if (addr < 0x1C00)
+		{
+			return VROM_AREA4[addr & 0x03ff];
+		}
+		else
+		{
+			return VROM_AREA5[addr & 0x03ff];
+		}
 	}
 	else // 4KB VRAM (0x1000)
 	{
@@ -169,6 +276,10 @@ void Mapper4::Reset()
 {
 }
 
+void Mapper4::SoftReset()
+{
+}
+
 void Mapper4::Close()
 {
 }
@@ -179,4 +290,20 @@ void Mapper4::Emulate(u32 clocks)
 
 int Mapper4::VMode() {
 	return header.is_pal;
+}
+
+void Mapper4::PPUHBlank()
+{
+	IRQValue--;
+	if (IRQValue <= 0)
+	{
+		IRQValue = IRQLatch;
+		if (IRQEnable)
+		{
+			IRQPending = true;
+		}
+	}
+
+	if (IRQPending)
+		cpu->Interrupt();
 }

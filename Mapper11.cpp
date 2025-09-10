@@ -20,9 +20,6 @@ Mapper11::Mapper11(NesROMHeader hdr, FILE* rom_file)
 	prom_mask = prom_size-1;
 	vrom_mask = vrom_size-1;
 
-	p_which_bank=0;
-	v_which_bank = 0;
-
 	PROM_AREA0 = PROM;
 	VROM_AREA0 = VROM;
 
@@ -52,8 +49,8 @@ void Mapper11::Write(u16 addr, u8 value)
 {
 	if(addr>=0x8000)
 	{
-		p_which_bank = min(value & 3, prom_banks-1);
-		v_which_bank = min((value>>4) & 7, vrom_banks-1);
+		int p_which_bank = min(value & 3, prom_banks-1);
+		int v_which_bank = min((value>>4) & 7, vrom_banks-1);
 		PROM_AREA0 = PROM + p_which_bank * 32768;
 		VROM_AREA0 = VROM + v_which_bank * 8192;
 	}
@@ -143,4 +140,8 @@ void Mapper11::Emulate(u32 clocks)
 int Mapper11::VMode() 
 {
 	return header.is_pal;
+}
+
+void Mapper11::PPUHBlank()
+{
 }

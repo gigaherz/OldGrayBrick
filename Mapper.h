@@ -86,6 +86,7 @@ public:
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
+	virtual void PPUHBlank();
 
 };
 
@@ -136,7 +137,7 @@ public:
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
-
+	virtual void PPUHBlank();
 };
 
 class Mapper2 : public Mapper
@@ -173,7 +174,7 @@ public:
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
-
+	virtual void PPUHBlank();
 };
 
 
@@ -213,7 +214,7 @@ public:
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
-
+	virtual void PPUHBlank();
 };
 
 class Mapper4 : public Mapper
@@ -227,9 +228,19 @@ private:
 	u8* PROM_AREA1;
 	u8* PROM_AREA2;
 	u8* PROM_AREA3;
+
 	u8* VROM_AREA0;
+	u8* VROM_AREA1;
+	u8* VROM_AREA2;
+	u8* VROM_AREA3;
+	u8* VROM_AREA4;
+	u8* VROM_AREA5;
 
 	NesROMHeader header;
+
+	int pram_banks;
+	int pram_size;
+	int pram_mask;
 
 	int prom_banks;
 	int prom_size;
@@ -239,25 +250,36 @@ private:
 	int vrom_size;
 	int vrom_mask;
 
-	u8 idx_ctrl;
-	u16 xor_prg;
-	u16 xor_ppu;
+	u8 BankSel;
+	u8 PRAMEnable; // MMC6 only
+	u8 PROMConfig;
+	u8 VROMConfig;
+	u8 PRAMWriteMask;
+	u8 PRAMReadMask;
+	u8 PRAMWriteMask2; // MMC6 only
+	u8 PRAMReadMask2;
 
-	u8 mirror_select;
+	u8 IRQLatch;
+	u8 IRQValue;
+	u8 IRQPending;
+	u8 IRQEnable;
+
+	u8 NametableCtrl;
 public:
 
 	Mapper4(NesROMHeader hdr, FILE* rom_file);
 	virtual ~Mapper4(void);
 	virtual void Write(u16 addr, u8 value);
-	virtual int Read(u16 addr);
+	virtual int  Read(u16 addr);
 	virtual void WritePPU(u16 addr, u8 value);
-	virtual int ReadPPU(u16 addr);
+	virtual int  ReadPPU(u16 addr);
 	virtual void Init();
 	virtual void Reset();
+	virtual void SoftReset();
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
-
+	virtual void PPUHBlank();
 };
 
 class Mapper11 : public Mapper
@@ -278,9 +300,6 @@ private:
 	int vrom_banks;
 	int vrom_size;
 	int vrom_mask;
-
-	u8 p_which_bank;
-	u8 v_which_bank;
 public:
 
 	Mapper11(NesROMHeader hdr, FILE* rom_file);
@@ -295,6 +314,6 @@ public:
 	virtual void Close();
 	virtual void Emulate(u32 clocks);
 	virtual int VMode();
-
+	virtual void PPUHBlank();
 };
 

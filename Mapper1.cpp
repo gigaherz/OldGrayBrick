@@ -261,3 +261,7 @@ int Mapper1::VMode()
 {
 	return header.is_pal;
 }
+
+void Mapper1::PPUHBlank()
+{
+}
